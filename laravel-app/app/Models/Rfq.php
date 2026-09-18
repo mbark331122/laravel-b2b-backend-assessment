@@ -106,6 +106,14 @@ class Rfq extends Model
         return $this->hasMany(RfqProposal::class);
     }
 
+    /**
+     * @return HasMany<RfqDistribution, $this>
+     */
+    public function distributions(): HasMany
+    {
+        return $this->hasMany(RfqDistribution::class)->orderBy('id');
+    }
+
     public function isEditable(): bool
     {
         return $this->status === self::STATUS_DRAFT;
@@ -139,7 +147,8 @@ class Rfq extends Model
     }
 
     /**
-     * Buyers see only their company RFQs. Suppliers never receive buyer RFQs (different company).
+     * Buyers see only their company RFQs.
+     * Suppliers do not use this scope for inbox access — use distributedToSupplierCompany().
      * Admin is not tenant-scoped.
      *
      * @param  Builder<Rfq>  $query
@@ -151,8 +160,59 @@ class Rfq extends Model
             return $query;
         }
 
-        // Suppliers are not part of the buyer RFQ workflow; keep tenant scoping only.
+        // Buyer RFQ list remains company-owned. Supplier inbox is a separate endpoint.
         return $query->where('company_id', $user->company_id);
+    }
+
+    /**
+     * RFQs explicitly distributed (active) to the authenticated supplier company.
+     *
+     * @param  Builder<Rfq>  $query
+     * @return Builder<Rfq>
+     */
+    public function scopeDistributedToSupplierCompany(Builder $query, int $supplierCompanyId): Builder
+    {
+        return $query->whereHas('distributions', function ($distributions) use ($supplierCompanyId): void {
+            $distributions->active()->where('supplier_company_id', $supplierCompanyId);
+        });
+    }
+
+    /**
+     * Supplier-facing RFQ payload (no other suppliers / matching metadata).
+     *
+     * @return array<string, mixed>
+     */
+    public function toSupplierApiArray(?RfqDistribution $distribution = null): array
+    {
+        $this->loadMissing('items');
+
+        $payload = [
+            'id' => $this->id,
+            'title' => $this->title,
+            'description' => $this->description,
+            'commodity' => $this->commodity,
+            'specification' => $this->specification,
+            'quantity' => $this->quantity,
+            'unit' => $this->unit,
+            'incoterm' => $this->incoterm,
+            'destination' => $this->destination,
+            'currency' => $this->currency,
+            'required_by_date' => $this->required_by_date?->format('Y-m-d'),
+            'status' => $this->status,
+            'items' => $this->items->map(fn (RfqItem $item) => $item->toApiArray())->values()->all(),
+            'created_at' => $this->created_at?->toISOString(),
+            'updated_at' => $this->updated_at?->toISOString(),
+        ];
+
+        if ($distribution !== null) {
+            $payload['distribution'] = [
+                'id' => $distribution->id,
+                'status' => $distribution->status,
+                'distributed_at' => $distribution->distributed_at?->toISOString(),
+            ];
+        }
+
+        return $payload;
     }
 
     /**

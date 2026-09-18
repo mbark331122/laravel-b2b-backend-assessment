@@ -26,6 +26,10 @@ class AuditLog extends Model
 
     public const RFQ_ITEM_DELETED = 'rfq.item.deleted';
 
+    public const RFQ_DISTRIBUTED = 'rfq.distributed';
+
+    public const RFQ_DISTRIBUTION_WITHDRAWN = 'rfq.distribution.withdrawn';
+
     public const RFQ_APPROVED = 'rfq.approved';
 
     public const PROPOSAL_CREATED = 'proposal.created';

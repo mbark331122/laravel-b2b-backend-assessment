@@ -25,6 +25,14 @@ class Permission extends Model
 
     public const RFQ_CLOSE = 'rfq.close';
 
+    public const RFQ_DISTRIBUTION_READ = 'rfq.distribution.read';
+
+    public const RFQ_DISTRIBUTION_CREATE = 'rfq.distribution.create';
+
+    public const RFQ_DISTRIBUTION_WITHDRAW = 'rfq.distribution.withdraw';
+
+    public const SUPPLIER_RFQ_READ = 'supplier.rfq.read';
+
     public const BANK_READ = 'bank.read';
 
     public const BANK_CHANGE_REQUEST = 'bank.change_request';
@@ -68,6 +76,10 @@ class Permission extends Model
             self::RFQ_SUBMIT,
             self::RFQ_CANCEL,
             self::RFQ_CLOSE,
+            self::RFQ_DISTRIBUTION_READ,
+            self::RFQ_DISTRIBUTION_CREATE,
+            self::RFQ_DISTRIBUTION_WITHDRAW,
+            self::SUPPLIER_RFQ_READ,
             self::BANK_READ,
             self::BANK_CHANGE_REQUEST,
             self::BANK_APPROVE,
@@ -98,6 +110,9 @@ class Permission extends Model
             self::RFQ_SUBMIT,
             self::RFQ_CANCEL,
             self::RFQ_CLOSE,
+            self::RFQ_DISTRIBUTION_READ,
+            self::RFQ_DISTRIBUTION_CREATE,
+            self::RFQ_DISTRIBUTION_WITHDRAW,
             self::BANK_READ,
             self::BANK_CHANGE_REQUEST,
             self::PRODUCT_READ,
@@ -108,6 +123,7 @@ class Permission extends Model
     /**
      * Permissions granted to supplier company users.
      * Suppliers intentionally do not receive RFQ create/update/lifecycle permissions.
+     * Sprint 5 grants read-only access to RFQs explicitly distributed to their company.
      *
      * @return list<string>
      */
@@ -121,6 +137,7 @@ class Permission extends Model
             self::SUPPLIER_PROFILE_READ,
             self::SUPPLIER_PROFILE_CREATE,
             self::SUPPLIER_PROFILE_UPDATE,
+            self::SUPPLIER_RFQ_READ,
         ];
     }
 

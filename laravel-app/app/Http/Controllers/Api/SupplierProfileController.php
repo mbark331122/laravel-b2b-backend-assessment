@@ -8,6 +8,7 @@ use App\Http\Requests\UpdateSupplierProfileRequest;
 use App\Models\AuditLog;
 use App\Models\SupplierProfile;
 use App\Services\AuditLogger;
+use App\Services\SupplierMatchingService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,25 +17,36 @@ class SupplierProfileController extends Controller
 {
     use AuthorizesRequests;
 
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, SupplierMatchingService $matching): JsonResponse
     {
         $this->authorize('viewAny', SupplierProfile::class);
 
-        $query = SupplierProfile::query()->visibleTo($request->user());
+        $user = $request->user();
 
-        if ($request->filled('q')) {
-            $term = '%'.str_replace(['%', '_'], ['\\%', '\\_'], (string) $request->query('q')).'%';
-            $query->where(function ($inner) use ($term): void {
-                $inner->where('display_name', 'like', $term)
-                    ->orWhere('description', 'like', $term);
-            });
+        if ($user->isBuyerUser()) {
+            $query = $matching->discoveryQuery(
+                $request->only(['q', 'product_category_id', 'brand_id', 'product_q']),
+                $user->company_id
+            );
+        } else {
+            $query = SupplierProfile::query()->visibleTo($user);
+
+            if ($request->filled('q')) {
+                $term = '%'.str_replace(['%', '_'], ['\\%', '\\_'], (string) $request->query('q')).'%';
+                $query->where(function ($inner) use ($term): void {
+                    $inner->where('display_name', 'like', $term)
+                        ->orWhere('description', 'like', $term);
+                });
+            }
+
+            if ($request->filled('status') && ($user->isAdmin() || $user->isSupplierUser())) {
+                $query->where('status', (string) $request->query('status'));
+            }
+
+            $query->orderBy('display_name')->orderBy('id');
         }
 
-        if ($request->filled('status') && ($request->user()->isAdmin() || $request->user()->isSupplierUser())) {
-            $query->where('status', (string) $request->query('status'));
-        }
-
-        $profiles = $query->orderBy('display_name')->orderBy('id')->get()
+        $profiles = $query->get()
             ->map(fn (SupplierProfile $profile) => $profile->toApiArray())
             ->values();
 
