@@ -155,6 +155,14 @@ class PurchaseOrder extends Model
         return $this->hasOne(Invoice::class);
     }
 
+    /**
+     * @return HasOne<Shipment, $this>
+     */
+    public function shipment(): HasOne
+    {
+        return $this->hasOne(Shipment::class);
+    }
+
     public function isDraft(): bool
     {
         return $this->status === self::STATUS_DRAFT;

@@ -1,6 +1,6 @@
 # Laravel Mini B2B Backend
 
-B2B procurement and supplier commerce API (multi-tenant). Current codebase includes identity/tenancy, supplier profiles, wholesale product catalog, RFQs, supplier matching & distribution, quotations, negotiation with immutable counter-offers, purchase orders with supplier confirmation, commercial invoices (snapshotted from confirmed POs), payment foundation (manual lifecycle, no gateway), mocked AI extraction with human approval, supplier bank-change approval, and auditability — with a fixed sprint roadmap for the full commercial lifecycle.
+B2B procurement and supplier commerce API (multi-tenant). Current codebase includes identity/tenancy, supplier profiles, wholesale product catalog, RFQs, supplier matching & distribution, quotations, negotiation with immutable counter-offers, purchase orders with supplier confirmation, commercial invoices (snapshotted from confirmed POs), payment foundation (manual lifecycle, no gateway), shipping & fulfillment foundation (one shipment per confirmed PO, no carrier APIs), mocked AI extraction with human approval, supplier bank-change approval, and auditability — with a fixed sprint roadmap for the full commercial lifecycle.
 
 There is no frontend. The API is the product.
 
@@ -31,6 +31,8 @@ This is a single Laravel 13 API application.
 **Commercial Invoices.** Suppliers create an invoice only from a **confirmed** purchase order (`POST /api/purchase-orders/{purchaseOrder}/invoice`). Commercial values are snapshotted from the confirmed PO (immutable after create). One invoice per PO (unique `purchase_order_id`); idempotent re-create returns the existing invoice. Server-generated unique `number` (`INV-{YEAR}-{id}`). Lifecycle: `draft` → `issued` | `cancelled`; `issued` → `voided` | `paid` (`paid` only via payment mark-paid). No ZATCA, tax engines, credit notes, refunds, shipping, or fulfillment.
 
 **Payments (foundation).** Buyers create a payment only for an **issued** invoice (`POST /api/invoices/{invoice}/payment`). Amount and currency are taken from the invoice total (client amounts ignored). Server-generated unique `number` (`PAY-{YEAR}-{id}`). Methods: `bank_transfer` / `cash` / `manual` (provider-independent labels only). Lifecycle: `pending` → `paid` | `failed` | `cancelled`. At most one pending payment per invoice (`active_lock`); after failed/cancelled a new payment may be created; a paid invoice cannot receive another payment. Supplier marks paid/failed (manual bookkeeping); buyer may cancel pending. Marking paid also transitions the invoice to `paid`. **No payment gateway, webhooks, wallets, bank APIs, refunds, or partial payments.**
+
+**Shipments (fulfillment foundation).** Suppliers create a shipment only from a **confirmed** purchase order (`POST /api/purchase-orders/{purchaseOrder}/shipment`). One shipment per PO (unique `purchase_order_id`); idempotent re-create returns the existing shipment. Server-generated unique `number` (`SHP-{YEAR}-{id}`). Line items and commercial values are snapshotted from the confirmed PO (full qty; no partial/split shipments). Immutable origin/destination address snapshots. Carrier / tracking / shipping_method are manual informational fields only. Lifecycle: `pending` → `processing` → `shipped` → `delivered`, or `pending`/`processing` → `cancelled`. Operational metadata updatable only while `pending`/`processing`. Independent of payment state. **No carrier APIs, tracking webhooks, warehouses, inventory, packages, or rate calculation.**
 
 **AI.** `MockAiExtractor` parses text only. It never receives or writes an RFQ. `AiExtractionService` stores an extraction and, when a field differs, a pending `RfqProposal`. Official RFQ fields change only in `RfqProposal::approve()`, using the stored proposed value.
 
@@ -114,6 +116,8 @@ PurchaseOrder 1──* PurchaseOrderItem
 PurchaseOrder 1──1 Invoice
 Invoice 1──* InvoiceItem
 Invoice 1──* Payment
+PurchaseOrder 1──1 Shipment
+Shipment 1──* ShipmentItem
 AiExtraction 1──* RfqProposal
 
 Supplier 1──1 SupplierBankAccount
@@ -125,7 +129,7 @@ AuditLog → actor (User), company (Company), auditable (morph)
 
 - **Companies** — tenants with buyer/supplier classification (`is_buyer`, `is_supplier`). Seeded: Company A/B (buyer), Supplier Company / Supplier Company B (supplier).
 - **Users** — `company_id` nullable (admin is null). `role_id` required. `company_id` / `role_id` are not fillable. Classification is read from the user's company.
-- **Roles / Permissions** — `admin` has all permissions. `company_user` has buyer RFQ/quotation/negotiation permissions plus `purchase_order.read|create|submit|cancel|complete`, `invoice.read`, and `payment.read|create|cancel`. `supplier_user` has catalog/quotation/negotiation permissions plus `purchase_order.read|confirm|reject`, `invoice.read|create|issue|cancel|void`, and `payment.read|mark_paid|mark_failed`. Platform-only: `brand.create`, `product.review`.
+- **Roles / Permissions** — `admin` has all permissions. `company_user` has buyer RFQ/quotation/negotiation permissions plus `purchase_order.read|create|submit|cancel|complete`, `invoice.read`, `payment.read|create|cancel`, and `shipment.read`. `supplier_user` has catalog/quotation/negotiation permissions plus `purchase_order.read|confirm|reject`, `invoice.read|create|issue|cancel|void`, `payment.read|mark_paid|mark_failed`, and `shipment.read|create|update|process|ship|deliver|cancel`. Platform-only: `brand.create`, `product.review`.
 - **Supplier Profiles** — one profile per supplier company (`display_name`, description, contact, status). Buyer discovery via `GET /api/supplier-profiles` returns only eligible suppliers (`status=active` + `company.is_supplier=true`), filterable by `q`, `product_category_id`, `brand_id`, `product_q`.
 - **Brands** — platform-level (`name`, `slug`, status). Readable with `product.read`; create requires `brand.create`.
 - **Product Categories** — platform-level categories (`name`, status).
@@ -143,6 +147,8 @@ AuditLog → actor (User), company (Company), auditable (morph)
 - **Invoices** — one per confirmed PO; unique `number`; snapshotted buyer/supplier/currency/totals from the PO; lifecycle `draft` / `issued` / `voided` / `paid` (via payment mark-paid) / `cancelled`.
 - **Invoice Items** — immutable line snapshots from PO items (not live Product/PO joins after create).
 - **Payments** — buyer-created against issued invoices; amount = invoice.total; unique `number`; methods `bank_transfer` / `cash` / `manual`; lifecycle `pending` / `paid` / `failed` / `cancelled`; one pending per invoice via `active_lock`.
+- **Shipments** — one per confirmed PO; unique `number`; PO item snapshots; origin/destination address snapshots; lifecycle `pending` / `processing` / `shipped` / `delivered` / `cancelled`.
+- **Shipment Items** — immutable fulfillment line snapshots from confirmed PO items (full quantity; no partials).
 - **AI Extractions** — proposed fields, confidence, source (`AI/mock`), status. Belongs to an RFQ. Does not replace the official RFQ.
 - **RFQ Proposals** — field-level conflict: current value, proposed value, source, confidence, status (`pending` / `approved` / `rejected`).
 - **Suppliers** — minimal tenant-owned record for bank data (not the catalog profile).
@@ -167,6 +173,7 @@ Tenant context is never taken from a client `company_id`.
 - Purchase order relationships and totals are derived from the accepted negotiation/offer. Client relationship IDs and money fields are ignored. Draft POs are buyer-only until submitted.
 - Invoice relationships and totals are derived from the confirmed PO. Client `company_id` / buyer/supplier IDs / `number` / money fields / status are ignored. Buyers read only their company invoices; suppliers create/issue/cancel/void only their own.
 - Payment relationships, amount, and currency are derived from the issued invoice. Client ownership IDs / `number` / amount / currency / status are ignored. Buyers create/cancel; suppliers mark paid/failed; neither side accesses another company’s payments.
+- Shipment relationships and line items are derived from the confirmed PO. Client ownership IDs / `number` / status / item qty/prices are ignored. Suppliers create and transition; buyers read only. Address snapshots are historical shipping data, not ownership.
 
 ## AI Safety
 
@@ -221,6 +228,7 @@ Important mutations are logged. Reads are not.
 | `purchase_order.created` / `submitted` / `confirmed` / `rejected` / `cancelled` / `completed` | PO lifecycle |
 | `invoice.created` / `issued` / `cancelled` / `voided` | Invoice lifecycle |
 | `payment.created` / `marked_paid` / `marked_failed` / `cancelled` | Payment lifecycle |
+| `shipment.created` / `updated` / `processing` / `shipped` / `delivered` / `cancelled` | Shipment lifecycle |
 | `rfq.approved` | Official RFQ changed by proposal approval |
 | `proposal.created` | A conflicting proposal is stored |
 | `proposal.approved` / `proposal.rejected` | Proposal resolved |
@@ -322,10 +330,21 @@ All routes below except login require `auth:sanctum`.
 | `POST` | `/api/payments/{payment}/mark-paid` | `payment.mark_paid` (pending → paid; supplier/admin) |
 | `POST` | `/api/payments/{payment}/mark-failed` | `payment.mark_failed` |
 | `POST` | `/api/payments/{payment}/cancel` | `payment.cancel` (pending only; buyer/admin) |
+| `POST` | `/api/purchase-orders/{purchaseOrder}/shipment` | `shipment.create` (confirmed PO only; supplier; idempotent) |
+| `GET` | `/api/purchase-orders/{purchaseOrder}/shipment` | `shipment.read` |
+| `GET` | `/api/shipments` | `shipment.read` (buyer company shipments) |
+| `GET` | `/api/shipments/{shipment}` | `shipment.read` |
+| `PATCH` | `/api/shipments/{shipment}` | `shipment.update` (carrier/tracking/method/notes; pending/processing only) |
+| `POST` | `/api/shipments/{shipment}/processing` | `shipment.process` |
+| `POST` | `/api/shipments/{shipment}/ship` | `shipment.ship` |
+| `POST` | `/api/shipments/{shipment}/deliver` | `shipment.deliver` |
+| `POST` | `/api/shipments/{shipment}/cancel` | `shipment.cancel` |
 | `GET` | `/api/supplier/invoices` | `invoice.read` (supplier company invoices) |
 | `GET` | `/api/supplier/invoices/{invoice}` | `invoice.read` |
 | `GET` | `/api/supplier/payments` | `payment.read` (supplier company payments) |
 | `GET` | `/api/supplier/payments/{payment}` | `payment.read` |
+| `GET` | `/api/supplier/shipments` | `shipment.read` (supplier company shipments) |
+| `GET` | `/api/supplier/shipments/{shipment}` | `shipment.read` |
 | `GET` | `/api/product-categories` | `product.read` |
 | `GET` | `/api/brands` | `product.read` |
 | `POST` | `/api/brands` | `brand.create` |
@@ -344,7 +363,7 @@ All routes below except login require `auth:sanctum`.
 php artisan test
 ```
 
-Latest full run: **206 tests**, **1589 assertions**, **0 failures**, **0 errors**, **0 skipped**.
+Latest full run: **pending verification after Sprint 11**.
 
 Coverage includes:
 
@@ -361,10 +380,13 @@ Coverage includes:
 - Payment creation from issued invoice (amount from invoice.total)
 - Payment lifecycle mark-paid / mark-failed / cancel
 - Duplicate pending payment prevention (`active_lock`)
+- Shipment creation from confirmed PO (one shipment per PO)
+- Shipment lifecycle processing / ship / deliver / cancel
+- Shipment item and address snapshot integrity
 - Cross-company isolation and spoofing defenses
 - AI extraction / proposals / bank change / audit trails
 
-**Not implemented:** payment gateways (Stripe/PayPal/Moyasar/etc.), webhooks, wallets, bank APIs, refunds, chargebacks, partial/split payments, ZATCA / e-invoicing, VAT/tax calculation engines, credit notes, shipping, delivery, fulfillment, inventory, messaging, ratings/scoring, AI matching, B2C checkout.
+**Not implemented:** payment gateways, carrier APIs (Aramex/DHL/FedEx/etc.), tracking webhooks, warehouses, inventory, packages, split/partial shipments, shipping rate calculation, refunds, chargebacks, ZATCA / e-invoicing, VAT/tax calculation engines, credit notes, B2C checkout.
 
 ## AI / Cursor Usage
 
@@ -402,6 +424,7 @@ Business rules were validated by those tests and by reading the write paths (`Mo
 - Purchase orders require an accepted negotiation and snapshotted accepted-offer terms. One PO per negotiation.
 - Invoices require a confirmed purchase order. One invoice per PO. Supplier creates/issues/cancels/voids; buyer reads. Invoice `paid` is set only when a payment is marked paid (not via invoice create payloads). Invoice tax amount is preserved from the PO (no tax engine).
 - Payments require an issued invoice. Buyer creates; amount = invoice.total. One pending payment per invoice. Supplier marks paid/failed; buyer cancels pending. No payment gateway or automatic money movement.
+- Shipments require a confirmed purchase order (independent of payment state). One shipment per PO. Supplier creates/updates/transitions; buyer reads. No carrier integrations or inventory.
 - The mock extractor targets text like `Need 25,000 MT ICUMSA 45 Sugar, CIF Jeddah.`
 - Extraction confidence is `0.9`; source is `AI/mock`.
 - Proposals are created per differing field.

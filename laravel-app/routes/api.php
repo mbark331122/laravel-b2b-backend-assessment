@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\RfqController;
 use App\Http\Controllers\Api\RfqDistributionController;
 use App\Http\Controllers\Api\RfqItemController;
 use App\Http\Controllers\Api\RfqProposalController;
+use App\Http\Controllers\Api\ShipmentController;
 use App\Http\Controllers\Api\SupplierBankAccountController;
 use App\Http\Controllers\Api\SupplierProfileController;
 use App\Http\Controllers\Api\SupplierQuotationController;
@@ -93,6 +94,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/purchase-orders/{purchaseOrder}/complete', [PurchaseOrderController::class, 'complete']);
     Route::post('/purchase-orders/{purchaseOrder}/invoice', [InvoiceController::class, 'store']);
     Route::get('/purchase-orders/{purchaseOrder}/invoice', [InvoiceController::class, 'showForPurchaseOrder']);
+    Route::post('/purchase-orders/{purchaseOrder}/shipment', [ShipmentController::class, 'store']);
+    Route::get('/purchase-orders/{purchaseOrder}/shipment', [ShipmentController::class, 'showForPurchaseOrder']);
 
     Route::get('/invoices', [InvoiceController::class, 'index']);
     Route::get('/invoices/{invoice}', [InvoiceController::class, 'show']);
@@ -106,6 +109,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/payments/{payment}/mark-paid', [PaymentController::class, 'markPaid']);
     Route::post('/payments/{payment}/mark-failed', [PaymentController::class, 'markFailed']);
     Route::post('/payments/{payment}/cancel', [PaymentController::class, 'cancel']);
+
+    Route::get('/shipments', [ShipmentController::class, 'index']);
+    Route::get('/shipments/{shipment}', [ShipmentController::class, 'show']);
+    Route::patch('/shipments/{shipment}', [ShipmentController::class, 'update']);
+    Route::post('/shipments/{shipment}/processing', [ShipmentController::class, 'processing']);
+    Route::post('/shipments/{shipment}/ship', [ShipmentController::class, 'ship']);
+    Route::post('/shipments/{shipment}/deliver', [ShipmentController::class, 'deliver']);
+    Route::post('/shipments/{shipment}/cancel', [ShipmentController::class, 'cancel']);
 
     Route::get('/supplier/negotiations', [NegotiationController::class, 'indexForSupplier']);
     Route::get('/supplier/negotiations/{negotiation}', [NegotiationController::class, 'show']);
@@ -121,6 +132,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/supplier/payments', [PaymentController::class, 'indexForSupplier']);
     Route::get('/supplier/payments/{payment}', [PaymentController::class, 'show']);
+
+    Route::get('/supplier/shipments', [ShipmentController::class, 'indexForSupplier']);
+    Route::get('/supplier/shipments/{shipment}', [ShipmentController::class, 'show']);
 
     Route::get('/product-categories', [ProductCategoryController::class, 'index']);
     Route::get('/brands', [BrandController::class, 'index']);

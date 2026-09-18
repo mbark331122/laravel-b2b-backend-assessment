@@ -88,6 +88,18 @@ class AuditLog extends Model
 
     public const PAYMENT_CANCELLED = 'payment.cancelled';
 
+    public const SHIPMENT_CREATED = 'shipment.created';
+
+    public const SHIPMENT_UPDATED = 'shipment.updated';
+
+    public const SHIPMENT_PROCESSING = 'shipment.processing';
+
+    public const SHIPMENT_SHIPPED = 'shipment.shipped';
+
+    public const SHIPMENT_DELIVERED = 'shipment.delivered';
+
+    public const SHIPMENT_CANCELLED = 'shipment.cancelled';
+
     public const RFQ_APPROVED = 'rfq.approved';
 
     public const PROPOSAL_CREATED = 'proposal.created';

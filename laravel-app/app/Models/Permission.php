@@ -93,6 +93,20 @@ class Permission extends Model
 
     public const PAYMENT_CANCEL = 'payment.cancel';
 
+    public const SHIPMENT_READ = 'shipment.read';
+
+    public const SHIPMENT_CREATE = 'shipment.create';
+
+    public const SHIPMENT_UPDATE = 'shipment.update';
+
+    public const SHIPMENT_PROCESS = 'shipment.process';
+
+    public const SHIPMENT_SHIP = 'shipment.ship';
+
+    public const SHIPMENT_DELIVER = 'shipment.deliver';
+
+    public const SHIPMENT_CANCEL = 'shipment.cancel';
+
     public const BANK_READ = 'bank.read';
 
     public const BANK_CHANGE_REQUEST = 'bank.change_request';
@@ -170,6 +184,13 @@ class Permission extends Model
             self::PAYMENT_MARK_PAID,
             self::PAYMENT_MARK_FAILED,
             self::PAYMENT_CANCEL,
+            self::SHIPMENT_READ,
+            self::SHIPMENT_CREATE,
+            self::SHIPMENT_UPDATE,
+            self::SHIPMENT_PROCESS,
+            self::SHIPMENT_SHIP,
+            self::SHIPMENT_DELIVER,
+            self::SHIPMENT_CANCEL,
             self::BANK_READ,
             self::BANK_CHANGE_REQUEST,
             self::BANK_APPROVE,
@@ -220,6 +241,7 @@ class Permission extends Model
             self::PAYMENT_READ,
             self::PAYMENT_CREATE,
             self::PAYMENT_CANCEL,
+            self::SHIPMENT_READ,
             self::BANK_READ,
             self::BANK_CHANGE_REQUEST,
             self::PRODUCT_READ,
@@ -268,6 +290,13 @@ class Permission extends Model
             self::PAYMENT_READ,
             self::PAYMENT_MARK_PAID,
             self::PAYMENT_MARK_FAILED,
+            self::SHIPMENT_READ,
+            self::SHIPMENT_CREATE,
+            self::SHIPMENT_UPDATE,
+            self::SHIPMENT_PROCESS,
+            self::SHIPMENT_SHIP,
+            self::SHIPMENT_DELIVER,
+            self::SHIPMENT_CANCEL,
         ];
     }
 
