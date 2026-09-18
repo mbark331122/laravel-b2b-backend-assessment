@@ -411,7 +411,7 @@ All routes below except login require `auth:sanctum`.
 php artisan test
 ```
 
-Latest full run: **pending verification after Sprint 14**.
+Latest full run: **227 tests**, **2255 assertions**, **0 failures**, **0 errors**, **0 skipped**.
 
 Coverage includes:
 
