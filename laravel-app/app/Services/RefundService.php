@@ -150,6 +150,15 @@ class RefundService
             /** @var Refund $locked */
             $locked = Refund::query()->whereKey($refund->id)->lockForUpdate()->firstOrFail();
 
+            /** @var CreditNote $creditNote */
+            $creditNote = CreditNote::query()->whereKey($locked->credit_note_id)->lockForUpdate()->firstOrFail();
+
+            if ($creditNote->status !== CreditNote::STATUS_ISSUED) {
+                throw ValidationException::withMessages([
+                    'refund' => 'Refund lifecycle actions require the related credit note to remain issued.',
+                ]);
+            }
+
             try {
                 $locked->transitionTo($to);
             } catch (InvalidArgumentException $exception) {

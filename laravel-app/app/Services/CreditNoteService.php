@@ -6,6 +6,7 @@ use App\Models\CreditNote;
 use App\Models\CreditNoteItem;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
+use App\Models\Refund;
 use App\Models\ReturnShipment;
 use App\Models\Rma;
 use App\Models\RmaItem;
@@ -208,6 +209,18 @@ class CreditNoteService
         return DB::transaction(function () use ($creditNote, $reason) {
             /** @var CreditNote $locked */
             $locked = CreditNote::query()->whereKey($creditNote->id)->lockForUpdate()->firstOrFail();
+
+            $refundExists = Refund::query()
+                ->where('credit_note_id', $locked->id)
+                ->lockForUpdate()
+                ->exists();
+
+            if ($refundExists) {
+                throw ValidationException::withMessages([
+                    'credit_note' => 'An issued credit note with a refund record cannot be voided.',
+                ]);
+            }
+
             $locked->void_reason = $reason;
 
             try {

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
+use App\Models\Payment;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Models\User;
@@ -141,6 +142,19 @@ class InvoiceService
         return DB::transaction(function () use ($invoice, $reason) {
             /** @var Invoice $locked */
             $locked = Invoice::query()->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
+
+            $blockingPayment = Payment::query()
+                ->where('invoice_id', $locked->id)
+                ->whereIn('status', [Payment::STATUS_PENDING, Payment::STATUS_PAID])
+                ->lockForUpdate()
+                ->exists();
+
+            if ($blockingPayment) {
+                throw ValidationException::withMessages([
+                    'invoice' => 'An invoice with a pending or paid payment cannot be voided.',
+                ]);
+            }
+
             $locked->void_reason = $reason;
 
             try {

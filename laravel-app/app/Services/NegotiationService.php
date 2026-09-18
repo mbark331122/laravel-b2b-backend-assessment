@@ -43,6 +43,18 @@ class NegotiationService
             // Lock quotation row to serialize concurrent open attempts.
             Quotation::query()->whereKey($quotation->id)->lockForUpdate()->first();
 
+            $accepted = Negotiation::query()
+                ->where('quotation_id', $quotation->id)
+                ->where('status', Negotiation::STATUS_ACCEPTED)
+                ->lockForUpdate()
+                ->exists();
+
+            if ($accepted) {
+                throw ValidationException::withMessages([
+                    'quotation' => 'An accepted negotiation already exists for this quotation.',
+                ]);
+            }
+
             $existing = Negotiation::query()
                 ->where('quotation_id', $quotation->id)
                 ->where('status', Negotiation::STATUS_OPEN)

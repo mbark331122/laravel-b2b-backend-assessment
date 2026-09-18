@@ -2,10 +2,10 @@
 
 namespace App\Services;
 
-use App\Models\Rma;
-use App\Models\RmaItem;
 use App\Models\ReturnShipment;
 use App\Models\ReturnShipmentItem;
+use App\Models\Rma;
+use App\Models\RmaItem;
 use App\Models\ShipmentItem;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -75,6 +75,18 @@ class ReturnShipmentService
                     ]),
                     'created' => false,
                 ];
+            }
+
+            $deliveredExists = ReturnShipment::query()
+                ->where('rma_id', $locked->id)
+                ->where('status', ReturnShipment::STATUS_DELIVERED)
+                ->lockForUpdate()
+                ->exists();
+
+            if ($deliveredExists) {
+                throw ValidationException::withMessages([
+                    'rma' => 'A delivered return shipment already exists for this RMA.',
+                ]);
             }
 
             $returnShipment = new ReturnShipment;
