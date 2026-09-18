@@ -16,7 +16,7 @@ This is a single Laravel 13 API application.
 
 **Authorization.** Roles (`admin`, `company_user`, `supplier_user`) own permissions. Policies enforce permission + tenant (and buyer/supplier classification) on every sensitive operation.
 
-**Catalog.** Supplier companies own a `SupplierProfile` and wholesale `Product` rows (MOQ, price, currency, category, active/inactive). Buyers may browse/view **active** products only. Product ownership always comes from the authenticated supplier company — never from client `company_id` / `supplier_id` / `tenant_id`.
+**Catalog.** Supplier companies own a `SupplierProfile` and wholesale `Product` rows (brand, specs, MOQ/max/increment, base price + tiers, lifecycle). Buyers may browse/view **published** products only. New supplier products start as `draft` and require lifecycle review before publication. Product ownership always comes from the authenticated supplier company — never from client `company_id` / `supplier_id` / `tenant_id`.
 
 **RFQ.** Official RFQ rows are the system of record. Buyer company users can create, read, and update their own RFQs. They cannot approve AI proposals.
 
@@ -64,7 +64,7 @@ Tests use an in-memory SQLite database (`phpunit.xml`). They do not need the fil
 
 Seeded bank records: Supplier A (Company A) and Supplier B (Company B), each with one active bank account (banking workflow — distinct from catalog `SupplierProfile`).
 
-Seeded catalog: categories Sugar/Grains; active + inactive products under Supplier Company; active product under Supplier Company B.
+Seeded catalog: brands Al Osra/GrainCo; categories Sugar/Grains; published + archived + draft products; specs and price tiers on published sugar.
 
 ### Auth
 
@@ -80,7 +80,10 @@ Company 1──* Rfq
 Company 1──* Supplier                 # bank workflow record (buyer-tenant owned)
 Company 1──1 SupplierProfile          # catalog supplier identity (supplier-tenant)
 Company 1──* Product
+Brand 1──* Product                    # platform-level brands
 ProductCategory 1──* Product
+Product 1──* ProductSpecification
+Product 1──* ProductPriceTier
 Role 1──* User
 Role *──* Permission
 
@@ -97,10 +100,11 @@ AuditLog → actor (User), company (Company), auditable (morph)
 
 - **Companies** — tenants with buyer/supplier classification (`is_buyer`, `is_supplier`). Seeded: Company A/B (buyer), Supplier Company / Supplier Company B (supplier).
 - **Users** — `company_id` nullable (admin is null). `role_id` required. `company_id` / `role_id` are not fillable. Classification is read from the user's company.
-- **Roles / Permissions** — `admin` has all permissions. `company_user` has buyer operational RFQ/bank permissions plus `product.read` / `supplier.profile.read` (not approve, not product mutate). `supplier_user` has catalog mutate permissions plus `rfq.read`.
-- **Supplier Profiles** — one profile per supplier company (`display_name`, description, contact, status).
+- **Roles / Permissions** — `admin` has all permissions. `company_user` has buyer operational RFQ/bank permissions plus `product.read` / `supplier.profile.read` (not approve, not product mutate). `supplier_user` has catalog mutate permissions plus `rfq.read`. Platform-only: `brand.create`, `product.review`.
+- **Supplier Profiles** — one profile per supplier company (`display_name`, description, contact, status). Buyer discovery via `GET /api/supplier-profiles`.
+- **Brands** — platform-level (`name`, `slug`, status). Readable with `product.read`; create requires `brand.create`.
 - **Product Categories** — platform-level categories (`name`, status).
-- **Products** — wholesale catalog owned by supplier `company_id` + `supplier_profile_id`: name, sku, description, category, unit, MOQ, wholesale_price, currency, status (`active`/`inactive`).
+- **Products** — wholesale catalog owned by supplier `company_id` + `supplier_profile_id`: name, sku, description, category, brand, unit, MOQ, maximum_order_quantity, quantity_increment, wholesale_price, currency, lifecycle status (`draft` / `pending_review` / `approved` / `published` / `rejected` / `archived`). Nested specs + price tiers. Buyers see `published` only.
 - **RFQs** — official commodity, specification, quantity, unit, incoterm, destination, status (`draft`), `company_id`.
 - **AI Extractions** — proposed fields, confidence, source (`AI/mock`), status. Belongs to an RFQ. Does not replace the official RFQ.
 - **RFQ Proposals** — field-level conflict: current value, proposed value, source, confidence, status (`pending` / `approved` / `rejected`).
@@ -196,16 +200,22 @@ All routes below except login require `auth:sanctum`.
 | `GET` | `/api/bank-change-requests/{id}` | `bank.read` |
 | `POST` | `/api/bank-change-requests/{id}/approve` | `bank.approve` |
 | `POST` | `/api/bank-change-requests/{id}/reject` | `bank.approve` |
+| `GET` | `/api/supplier-profiles` | `supplier.profile.read` (search/filter) |
 | `GET` | `/api/supplier-profile` | `supplier.profile.read` (own) |
 | `POST` | `/api/supplier-profile` | `supplier.profile.create` |
 | `GET` | `/api/supplier-profiles/{id}` | `supplier.profile.read` |
 | `PUT/PATCH` | `/api/supplier-profiles/{id}` | `supplier.profile.update` |
 | `GET` | `/api/product-categories` | `product.read` |
-| `GET` | `/api/products` | `product.read` |
-| `POST` | `/api/products` | `product.create` |
+| `GET` | `/api/brands` | `product.read` |
+| `POST` | `/api/brands` | `brand.create` |
+| `GET` | `/api/products` | `product.read` (filters: `q`, category, brand, supplier, currency, moq; buyers = published only) |
+| `POST` | `/api/products` | `product.create` (always starts `draft`) |
 | `GET` | `/api/products/{product}` | `product.read` |
 | `PUT/PATCH` | `/api/products/{product}` | `product.update` |
 | `DELETE` | `/api/products/{product}` | `product.delete` |
+| `POST` | `/api/products/{product}/transitions` | lifecycle transition (`product.update` / `product.review`) |
+| `GET/PUT` | `/api/products/{product}/specifications` | `product.read` / `product.update` |
+| `GET/PUT` | `/api/products/{product}/price-tiers` | `product.read` / `product.update` |
 
 ## Testing
 
@@ -213,7 +223,7 @@ All routes below except login require `auth:sanctum`.
 php artisan test
 ```
 
-Latest full run: **127 tests**, **556 assertions**, **0 failures**, **0 errors**, **0 skipped**.
+Latest full run: **136 tests**, **634 assertions**, **0 failures**, **0 errors**, **0 skipped**.
 
 Coverage includes:
 

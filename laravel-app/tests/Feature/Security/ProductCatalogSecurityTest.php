@@ -115,7 +115,7 @@ class ProductCatalogSecurityTest extends SecurityTestCase
             ]))
             ->assertForbidden();
 
-        $product = Product::query()->where('status', Product::STATUS_ACTIVE)->firstOrFail();
+        $product = Product::query()->where('status', Product::STATUS_PUBLISHED)->firstOrFail();
 
         $this->actingAs($buyer, 'sanctum')
             ->putJson('/api/products/'.$product->id, ['name' => 'Buyer Edit'])

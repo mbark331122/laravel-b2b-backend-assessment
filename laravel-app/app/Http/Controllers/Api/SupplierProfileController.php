@@ -16,6 +16,33 @@ class SupplierProfileController extends Controller
 {
     use AuthorizesRequests;
 
+    public function index(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', SupplierProfile::class);
+
+        $query = SupplierProfile::query()->visibleTo($request->user());
+
+        if ($request->filled('q')) {
+            $term = '%'.str_replace(['%', '_'], ['\\%', '\\_'], (string) $request->query('q')).'%';
+            $query->where(function ($inner) use ($term): void {
+                $inner->where('display_name', 'like', $term)
+                    ->orWhere('description', 'like', $term);
+            });
+        }
+
+        if ($request->filled('status') && ($request->user()->isAdmin() || $request->user()->isSupplierUser())) {
+            $query->where('status', (string) $request->query('status'));
+        }
+
+        $profiles = $query->orderBy('display_name')->orderBy('id')->get()
+            ->map(fn (SupplierProfile $profile) => $profile->toApiArray())
+            ->values();
+
+        return response()->json([
+            'supplier_profiles' => $profiles,
+        ]);
+    }
+
     public function show(Request $request): JsonResponse
     {
         $profile = $request->user()->company?->supplierProfile;

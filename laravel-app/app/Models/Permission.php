@@ -31,11 +31,15 @@ class Permission extends Model
 
     public const PRODUCT_DELETE = 'product.delete';
 
+    public const PRODUCT_REVIEW = 'product.review';
+
     public const SUPPLIER_PROFILE_READ = 'supplier.profile.read';
 
     public const SUPPLIER_PROFILE_CREATE = 'supplier.profile.create';
 
     public const SUPPLIER_PROFILE_UPDATE = 'supplier.profile.update';
+
+    public const BRAND_CREATE = 'brand.create';
 
     /**
      * Platform permission catalog.
@@ -59,9 +63,11 @@ class Permission extends Model
             self::PRODUCT_CREATE,
             self::PRODUCT_UPDATE,
             self::PRODUCT_DELETE,
+            self::PRODUCT_REVIEW,
             self::SUPPLIER_PROFILE_READ,
             self::SUPPLIER_PROFILE_CREATE,
             self::SUPPLIER_PROFILE_UPDATE,
+            self::BRAND_CREATE,
         ];
     }
 

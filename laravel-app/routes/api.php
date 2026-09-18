@@ -3,8 +3,11 @@
 use App\Http\Controllers\Api\AiExtractionController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BankChangeRequestController;
+use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\ProductPriceTierController;
+use App\Http\Controllers\Api\ProductSpecificationController;
 use App\Http\Controllers\Api\RfqController;
 use App\Http\Controllers\Api\RfqProposalController;
 use App\Http\Controllers\Api\SupplierBankAccountController;
@@ -29,6 +32,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/bank-change-requests/{bankChangeRequest}/approve', [BankChangeRequestController::class, 'approve']);
     Route::post('/bank-change-requests/{bankChangeRequest}/reject', [BankChangeRequestController::class, 'reject']);
 
+    Route::get('/supplier-profiles', [SupplierProfileController::class, 'index']);
     Route::get('/supplier-profile', [SupplierProfileController::class, 'show']);
     Route::post('/supplier-profile', [SupplierProfileController::class, 'store']);
     Route::put('/supplier-profiles/{supplierProfile}', [SupplierProfileController::class, 'update']);
@@ -36,5 +40,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/supplier-profiles/{supplierProfile}', [SupplierProfileController::class, 'showById']);
 
     Route::get('/product-categories', [ProductCategoryController::class, 'index']);
+    Route::get('/brands', [BrandController::class, 'index']);
+    Route::post('/brands', [BrandController::class, 'store']);
+
     Route::apiResource('products', ProductController::class);
+    Route::post('/products/{product}/transitions', [ProductController::class, 'transition']);
+    Route::get('/products/{product}/specifications', [ProductSpecificationController::class, 'index']);
+    Route::put('/products/{product}/specifications', [ProductSpecificationController::class, 'sync']);
+    Route::get('/products/{product}/price-tiers', [ProductPriceTierController::class, 'index']);
+    Route::put('/products/{product}/price-tiers', [ProductPriceTierController::class, 'sync']);
 });

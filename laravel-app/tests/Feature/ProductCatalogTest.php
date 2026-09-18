@@ -37,9 +37,10 @@ class ProductCatalogTest extends TestCase
             'product_category_id' => $categoryId,
             'unit' => 'MT',
             'minimum_order_quantity' => 1000,
+            'maximum_order_quantity' => 10000,
+            'quantity_increment' => 100,
             'wholesale_price' => 455.50,
             'currency' => 'USD',
-            'status' => Product::STATUS_ACTIVE,
             ...$overrides,
         ];
     }
@@ -55,15 +56,18 @@ class ProductCatalogTest extends TestCase
                 'supplier_id' => 999,
                 'tenant_id' => 999,
                 'supplier_profile_id' => 999,
+                'status' => Product::STATUS_PUBLISHED,
             ]))
             ->assertCreated()
             ->assertJsonPath('product.company_id', $supplier->company_id)
-            ->assertJsonPath('product.supplier_profile_id', $supplier->company->supplierProfile->id);
+            ->assertJsonPath('product.supplier_profile_id', $supplier->company->supplierProfile->id)
+            ->assertJsonPath('product.status', Product::STATUS_DRAFT);
 
         $this->assertDatabaseHas('products', [
             'id' => $response->json('product.id'),
             'company_id' => $supplier->company_id,
             'sku' => 'SUG-NEW-01',
+            'status' => Product::STATUS_DRAFT,
         ]);
         $this->assertDatabaseHas('audit_logs', [
             'action' => AuditLog::PRODUCT_CREATED,
@@ -84,7 +88,10 @@ class ProductCatalogTest extends TestCase
     public function test_supplier_can_list_view_update_and_delete_own_products(): void
     {
         $supplier = User::query()->where('email', UserSeeder::SUPPLIER_USER_EMAIL)->firstOrFail();
-        $ownProduct = Product::query()->where('company_id', $supplier->company_id)->where('status', Product::STATUS_ACTIVE)->firstOrFail();
+        $ownProduct = Product::query()
+            ->where('company_id', $supplier->company_id)
+            ->where('status', Product::STATUS_PUBLISHED)
+            ->firstOrFail();
 
         $this->actingAs($supplier, 'sanctum')
             ->getJson('/api/products')
@@ -99,13 +106,12 @@ class ProductCatalogTest extends TestCase
         $this->actingAs($supplier, 'sanctum')
             ->putJson('/api/products/'.$ownProduct->id, [
                 'name' => 'Updated Sugar',
-                'status' => Product::STATUS_INACTIVE,
                 'company_id' => 999,
             ])
             ->assertOk()
             ->assertJsonPath('product.name', 'Updated Sugar')
-            ->assertJsonPath('product.status', Product::STATUS_INACTIVE)
-            ->assertJsonPath('product.company_id', $supplier->company_id);
+            ->assertJsonPath('product.company_id', $supplier->company_id)
+            ->assertJsonPath('product.status', Product::STATUS_PUBLISHED);
 
         $this->assertDatabaseHas('audit_logs', [
             'action' => AuditLog::PRODUCT_UPDATED,
@@ -149,34 +155,40 @@ class ProductCatalogTest extends TestCase
         $this->assertDatabaseHas('products', ['id' => $productB->id]);
     }
 
-    public function test_buyer_can_browse_and_view_active_products_only(): void
+    public function test_buyer_can_browse_and_view_published_products_only(): void
     {
         $buyer = User::query()->where('email', UserSeeder::USER_A_EMAIL)->firstOrFail();
-        $active = Product::query()->where('status', Product::STATUS_ACTIVE)->firstOrFail();
-        $inactive = Product::query()->where('status', Product::STATUS_INACTIVE)->firstOrFail();
+        $published = Product::query()->where('status', Product::STATUS_PUBLISHED)->firstOrFail();
+        $archived = Product::query()->where('status', Product::STATUS_ARCHIVED)->firstOrFail();
+        $draft = Product::query()->where('status', Product::STATUS_DRAFT)->firstOrFail();
 
         $response = $this->actingAs($buyer, 'sanctum')
             ->getJson('/api/products')
             ->assertOk();
 
         $ids = collect($response->json('products'))->pluck('id');
-        $this->assertTrue($ids->contains($active->id));
-        $this->assertFalse($ids->contains($inactive->id));
+        $this->assertTrue($ids->contains($published->id));
+        $this->assertFalse($ids->contains($archived->id));
+        $this->assertFalse($ids->contains($draft->id));
 
         $this->actingAs($buyer, 'sanctum')
-            ->getJson('/api/products/'.$active->id)
+            ->getJson('/api/products/'.$published->id)
             ->assertOk()
-            ->assertJsonPath('product.id', $active->id);
+            ->assertJsonPath('product.id', $published->id);
 
         $this->actingAs($buyer, 'sanctum')
-            ->getJson('/api/products/'.$inactive->id)
+            ->getJson('/api/products/'.$archived->id)
+            ->assertNotFound();
+
+        $this->actingAs($buyer, 'sanctum')
+            ->getJson('/api/products/'.$draft->id)
             ->assertNotFound();
     }
 
     public function test_buyer_cannot_update_or_delete_products(): void
     {
         $buyer = User::query()->where('email', UserSeeder::USER_A_EMAIL)->firstOrFail();
-        $product = Product::query()->where('status', Product::STATUS_ACTIVE)->firstOrFail();
+        $product = Product::query()->where('status', Product::STATUS_PUBLISHED)->firstOrFail();
 
         $this->actingAs($buyer, 'sanctum')
             ->putJson('/api/products/'.$product->id, ['name' => 'Nope'])
@@ -201,7 +213,6 @@ class ProductCatalogTest extends TestCase
                 'minimum_order_quantity' => -5,
                 'wholesale_price' => -10,
                 'currency' => 'XXX',
-                'status' => 'archived',
             ]))
             ->assertUnprocessable()
             ->assertJsonValidationErrors([
@@ -211,7 +222,6 @@ class ProductCatalogTest extends TestCase
                 'minimum_order_quantity',
                 'wholesale_price',
                 'currency',
-                'status',
             ]);
 
         $this->actingAs($supplier, 'sanctum')
@@ -222,16 +232,16 @@ class ProductCatalogTest extends TestCase
             ->assertJsonValidationErrors(['minimum_order_quantity']);
     }
 
-    public function test_supplier_can_list_own_inactive_products_but_not_other_suppliers(): void
+    public function test_supplier_can_list_own_non_published_products_but_not_other_suppliers(): void
     {
         $supplier = User::query()->where('email', UserSeeder::SUPPLIER_USER_EMAIL)->firstOrFail();
-        $inactiveOwn = Product::query()
+        $archivedOwn = Product::query()
             ->where('company_id', $supplier->company_id)
-            ->where('status', Product::STATUS_INACTIVE)
+            ->where('status', Product::STATUS_ARCHIVED)
             ->firstOrFail();
-        $otherActive = Product::query()
+        $otherPublished = Product::query()
             ->where('company_id', '!=', $supplier->company_id)
-            ->where('status', Product::STATUS_ACTIVE)
+            ->where('status', Product::STATUS_PUBLISHED)
             ->firstOrFail();
 
         $response = $this->actingAs($supplier, 'sanctum')
@@ -239,7 +249,7 @@ class ProductCatalogTest extends TestCase
             ->assertOk();
 
         $ids = collect($response->json('products'))->pluck('id');
-        $this->assertTrue($ids->contains($inactiveOwn->id));
-        $this->assertFalse($ids->contains($otherActive->id));
+        $this->assertTrue($ids->contains($archivedOwn->id));
+        $this->assertFalse($ids->contains($otherPublished->id));
     }
 }

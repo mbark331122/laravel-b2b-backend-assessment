@@ -24,8 +24,7 @@ class ProductPolicy
             return Response::allow();
         }
 
-        // Buyers may only view active catalog products.
-        if ($user->isBuyerUser() && $product->status === Product::STATUS_ACTIVE) {
+        if ($user->isBuyerUser() && $product->isBuyerVisible()) {
             return Response::allow();
         }
 
@@ -59,6 +58,23 @@ class ProductPolicy
         }
 
         if (! $user->isAdmin() && ! $user->isSupplierUser()) {
+            return Response::deny();
+        }
+
+        return $this->ownerResponse($user, $product);
+    }
+
+    public function transition(User $user, Product $product): Response
+    {
+        if ($user->isAdmin()) {
+            if ($user->hasPermission(Permission::PRODUCT_REVIEW) || $user->hasPermission(Permission::PRODUCT_UPDATE)) {
+                return Response::allow();
+            }
+
+            return Response::deny();
+        }
+
+        if (! $user->hasPermission(Permission::PRODUCT_UPDATE) || ! $user->isSupplierUser()) {
             return Response::deny();
         }
 

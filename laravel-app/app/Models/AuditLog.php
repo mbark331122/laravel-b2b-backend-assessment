@@ -38,6 +38,14 @@ class AuditLog extends Model
 
     public const PRODUCT_DELETED = 'product.deleted';
 
+    public const PRODUCT_TRANSITIONED = 'product.transitioned';
+
+    public const BRAND_CREATED = 'brand.created';
+
+    public const PRODUCT_SPECIFICATIONS_UPDATED = 'product.specifications.updated';
+
+    public const PRODUCT_PRICE_TIERS_UPDATED = 'product.price_tiers.updated';
+
     /**
      * @var list<string>
      */
