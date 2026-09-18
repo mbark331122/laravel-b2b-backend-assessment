@@ -1,8 +1,10 @@
 # Laravel Mini B2B Backend
 
-Assessment backend for multi-tenant RFQs, mocked AI extraction with human approval, supplier bank-change approval, and auditability.
+B2B procurement and supplier commerce API (multi-tenant). Current codebase includes RFQs, mocked AI extraction with human approval, supplier bank-change approval, and auditability — with a fixed sprint roadmap to complete the full commercial lifecycle.
 
 There is no frontend. The API is the product.
+
+**Sprint 0 architecture docs:** [`docs/sprint-0/`](docs/sprint-0/)
 
 ## Architecture
 
