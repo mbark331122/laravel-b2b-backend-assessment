@@ -1,6 +1,6 @@
 # Laravel Mini B2B Backend
 
-B2B procurement and supplier commerce API (multi-tenant). Current codebase includes identity/tenancy, supplier profiles, wholesale product catalog, RFQs, supplier matching & distribution, quotations, negotiation with immutable counter-offers, purchase orders with supplier confirmation, mocked AI extraction with human approval, supplier bank-change approval, and auditability — with a fixed sprint roadmap for the full commercial lifecycle.
+B2B procurement and supplier commerce API (multi-tenant). Current codebase includes identity/tenancy, supplier profiles, wholesale product catalog, RFQs, supplier matching & distribution, quotations, negotiation with immutable counter-offers, purchase orders with supplier confirmation, commercial invoices (snapshotted from confirmed POs), mocked AI extraction with human approval, supplier bank-change approval, and auditability — with a fixed sprint roadmap for the full commercial lifecycle.
 
 There is no frontend. The API is the product.
 
@@ -26,7 +26,9 @@ This is a single Laravel 13 API application.
 
 **Negotiation.** Participants open a negotiation against an active submitted quotation (`POST /api/quotations/{quotation}/negotiation`). An immutable initial offer (sequence 1, supplier side) is snapshotted from the quotation. Counter-offers are append-only (`POST /api/negotiations/{negotiation}/offers`) with server-enforced alternating turns. Offers cannot be edited or deleted. Lifecycle: `open` → `accepted` | `rejected` | `withdrawn` | `expired`. Acceptance is by the opposite party on the latest proposed unexpired offer (transaction + row locks). Original quotation is never mutated. No ranking or automatic winner selection.
 
-**Purchase Orders.** Buyers create a PO only from an **accepted** negotiation (`POST /api/negotiations/{negotiation}/purchase-order`). Commercial terms are snapshotted from the accepted offer (immutable). One PO per negotiation (unique `negotiation_id`); idempotent re-create returns the existing PO. Server-generated unique `number` (`PO-{YEAR}-{id}`). Lifecycle: `draft` → `pending_supplier_confirmation` → `confirmed` → `completed` (or `rejected` / `cancelled`). Supplier confirms/rejects after submit; buyer cancels while draft/pending; buyer completes confirmed POs. No payments, invoices, shipments, or notifications.
+**Purchase Orders.** Buyers create a PO only from an **accepted** negotiation (`POST /api/negotiations/{negotiation}/purchase-order`). Commercial terms are snapshotted from the accepted offer (immutable). One PO per negotiation (unique `negotiation_id`); idempotent re-create returns the existing PO. Server-generated unique `number` (`PO-{YEAR}-{id}`). Lifecycle: `draft` → `pending_supplier_confirmation` → `confirmed` → `completed` (or `rejected` / `cancelled`). Supplier confirms/rejects after submit; buyer cancels while draft/pending; buyer completes confirmed POs.
+
+**Commercial Invoices.** Suppliers create an invoice only from a **confirmed** purchase order (`POST /api/purchase-orders/{purchaseOrder}/invoice`). Commercial values are snapshotted from the confirmed PO (immutable after create). One invoice per PO (unique `purchase_order_id`); idempotent re-create returns the existing invoice. Server-generated unique `number` (`INV-{YEAR}-{id}`). Lifecycle: `draft` → `issued` | `cancelled`; `issued` → `voided`. `paid` exists as a reserved bookkeeping state but is unreachable via public APIs. No payment processing, ZATCA, tax engines, credit notes, refunds, shipping, or fulfillment.
 
 **AI.** `MockAiExtractor` parses text only. It never receives or writes an RFQ. `AiExtractionService` stores an extraction and, when a field differs, a pending `RfqProposal`. Official RFQ fields change only in `RfqProposal::approve()`, using the stored proposed value.
 
@@ -107,6 +109,8 @@ Negotiation 1──* NegotiationOffer (append-only)
 NegotiationOffer 1──* NegotiationOfferItem → RfqItem
 Negotiation 1──1 PurchaseOrder
 PurchaseOrder 1──* PurchaseOrderItem
+PurchaseOrder 1──1 Invoice
+Invoice 1──* InvoiceItem
 AiExtraction 1──* RfqProposal
 
 Supplier 1──1 SupplierBankAccount
@@ -118,7 +122,7 @@ AuditLog → actor (User), company (Company), auditable (morph)
 
 - **Companies** — tenants with buyer/supplier classification (`is_buyer`, `is_supplier`). Seeded: Company A/B (buyer), Supplier Company / Supplier Company B (supplier).
 - **Users** — `company_id` nullable (admin is null). `role_id` required. `company_id` / `role_id` are not fillable. Classification is read from the user's company.
-- **Roles / Permissions** — `admin` has all permissions. `company_user` has buyer RFQ/quotation/negotiation permissions plus `purchase_order.read|create|submit|cancel|complete`. `supplier_user` has catalog/quotation/negotiation permissions plus `purchase_order.read|confirm|reject`. Platform-only: `brand.create`, `product.review`.
+- **Roles / Permissions** — `admin` has all permissions. `company_user` has buyer RFQ/quotation/negotiation permissions plus `purchase_order.read|create|submit|cancel|complete` and `invoice.read`. `supplier_user` has catalog/quotation/negotiation permissions plus `purchase_order.read|confirm|reject` and `invoice.read|create|issue|cancel|void`. Platform-only: `brand.create`, `product.review`.
 - **Supplier Profiles** — one profile per supplier company (`display_name`, description, contact, status). Buyer discovery via `GET /api/supplier-profiles` returns only eligible suppliers (`status=active` + `company.is_supplier=true`), filterable by `q`, `product_category_id`, `brand_id`, `product_q`.
 - **Brands** — platform-level (`name`, `slug`, status). Readable with `product.read`; create requires `brand.create`.
 - **Product Categories** — platform-level categories (`name`, status).
@@ -133,6 +137,8 @@ AuditLog → actor (User), company (Company), auditable (morph)
 - **Negotiation Offer Items** — historical commercial lines with snapshots; server-calculated totals.
 - **Purchase Orders** — one per accepted negotiation; unique `number`; snapshotted currency/totals/items from accepted offer; lifecycle `draft` / `pending_supplier_confirmation` / `confirmed` / `rejected` / `cancelled` / `completed`.
 - **Purchase Order Items** — immutable commercial snapshots (not live Product/Quotation joins).
+- **Invoices** — one per confirmed PO; unique `number`; snapshotted buyer/supplier/currency/totals from the PO; lifecycle `draft` / `issued` / `voided` / `paid` (reserved) / `cancelled`.
+- **Invoice Items** — immutable line snapshots from PO items (not live Product/PO joins after create).
 - **AI Extractions** — proposed fields, confidence, source (`AI/mock`), status. Belongs to an RFQ. Does not replace the official RFQ.
 - **RFQ Proposals** — field-level conflict: current value, proposed value, source, confidence, status (`pending` / `approved` / `rejected`).
 - **Suppliers** — minimal tenant-owned record for bank data (not the catalog profile).
@@ -155,6 +161,7 @@ Tenant context is never taken from a client `company_id`.
 - Quotation ownership is the authenticated supplier company. Buyers only see non-draft quotations on RFQs they own. Spoofed `supplier_id` / `company_id` / `tenant_id` / `rfq_distribution_id` are ignored.
 - Negotiation participants and turn side are resolved server-side from RFQ/quotation ownership. Client `side` / `party` / company IDs are ignored. Historical offers have no update/delete routes.
 - Purchase order relationships and totals are derived from the accepted negotiation/offer. Client relationship IDs and money fields are ignored. Draft POs are buyer-only until submitted.
+- Invoice relationships and totals are derived from the confirmed PO. Client `company_id` / buyer/supplier IDs / `number` / money fields / status are ignored. Buyers read only their company invoices; suppliers create/issue/cancel/void only their own.
 
 ## AI Safety
 
@@ -207,6 +214,7 @@ Important mutations are logged. Reads are not.
 | `negotiation.offer.accepted` | Offer accepted; negotiation closed |
 | `negotiation.rejected` / `withdrawn` | Negotiation terminated |
 | `purchase_order.created` / `submitted` / `confirmed` / `rejected` / `cancelled` / `completed` | PO lifecycle |
+| `invoice.created` / `issued` / `cancelled` / `voided` | Invoice lifecycle |
 | `rfq.approved` | Official RFQ changed by proposal approval |
 | `proposal.created` | A conflicting proposal is stored |
 | `proposal.approved` / `proposal.rejected` | Proposal resolved |
@@ -295,6 +303,15 @@ All routes below except login require `auth:sanctum`.
 | `GET` | `/api/supplier/purchase-orders/{purchaseOrder}` | `purchase_order.read` |
 | `POST` | `/api/supplier/purchase-orders/{purchaseOrder}/confirm` | `purchase_order.confirm` |
 | `POST` | `/api/supplier/purchase-orders/{purchaseOrder}/reject` | `purchase_order.reject` (requires `reason`) |
+| `POST` | `/api/purchase-orders/{purchaseOrder}/invoice` | `invoice.create` (confirmed PO only; supplier; idempotent) |
+| `GET` | `/api/purchase-orders/{purchaseOrder}/invoice` | `invoice.read` |
+| `GET` | `/api/invoices` | `invoice.read` (buyer company invoices) |
+| `GET` | `/api/invoices/{invoice}` | `invoice.read` |
+| `POST` | `/api/invoices/{invoice}/issue` | `invoice.issue` (draft → issued) |
+| `POST` | `/api/invoices/{invoice}/cancel` | `invoice.cancel` (draft only) |
+| `POST` | `/api/invoices/{invoice}/void` | `invoice.void` (issued only; requires `reason`) |
+| `GET` | `/api/supplier/invoices` | `invoice.read` (supplier company invoices) |
+| `GET` | `/api/supplier/invoices/{invoice}` | `invoice.read` |
 | `GET` | `/api/product-categories` | `product.read` |
 | `GET` | `/api/brands` | `product.read` |
 | `POST` | `/api/brands` | `brand.create` |
@@ -313,7 +330,7 @@ All routes below except login require `auth:sanctum`.
 php artisan test
 ```
 
-Latest full run: **192 tests**, **1224 assertions**, **0 failures**, **0 errors**, **0 skipped**.
+Latest full run: **200 tests**, **1411 assertions**, **0 failures**, **0 errors**, **0 skipped**.
 
 Coverage includes:
 
@@ -323,10 +340,14 @@ Coverage includes:
 - PO lifecycle submit / confirm / reject / cancel / complete
 - PO snapshot integrity vs product mutations
 - PO number uniqueness and idempotent creation
+- Invoice creation from confirmed PO (one invoice per PO)
+- Invoice lifecycle issue / cancel / void
+- Invoice snapshot integrity vs product/PO mutations
+- Invoice number uniqueness and idempotent creation
 - Cross-company isolation and spoofing defenses
 - AI extraction / proposals / bank change / audit trails
 
-**Not implemented yet:** payments, invoices, shipments, fulfillment, messaging, ratings/scoring, AI matching, automatic PO creation without accepted negotiation.
+**Not implemented:** payment processing, ZATCA / e-invoicing, VAT/tax calculation engines, credit notes, refunds, shipping, delivery, fulfillment, inventory, messaging, ratings/scoring, AI matching, automatic payment status, B2C checkout.
 
 ## AI / Cursor Usage
 
@@ -362,6 +383,7 @@ Business rules were validated by those tests and by reading the write paths (`Mo
 - Quotations require an active distribution belonging to the authenticated supplier. Submission requires every RFQ item to be quoted. Expired submitted quotes are marked `expired` on read when `valid_until` is past.
 - Negotiations require an active submitted quotation. One open negotiation per quotation. Counter-offers alternate sides. Acceptance does not create a purchase order automatically — buyers create POs explicitly.
 - Purchase orders require an accepted negotiation and snapshotted accepted-offer terms. One PO per negotiation.
+- Invoices require a confirmed purchase order. One invoice per PO. Supplier creates/issues/cancels/voids; buyer reads. `paid` is reserved and not settable via public APIs. Invoice tax amount is preserved from the PO (no tax engine).
 - The mock extractor targets text like `Need 25,000 MT ICUMSA 45 Sugar, CIF Jeddah.`
 - Extraction confidence is `0.9`; source is `AI/mock`.
 - Proposals are created per differing field.

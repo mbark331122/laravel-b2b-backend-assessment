@@ -7,62 +7,53 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use InvalidArgumentException;
 
 #[Fillable([])]
-class PurchaseOrder extends Model
+class Invoice extends Model
 {
     public const STATUS_DRAFT = 'draft';
 
-    public const STATUS_PENDING_SUPPLIER_CONFIRMATION = 'pending_supplier_confirmation';
+    public const STATUS_ISSUED = 'issued';
 
-    public const STATUS_CONFIRMED = 'confirmed';
+    public const STATUS_VOIDED = 'voided';
 
-    public const STATUS_REJECTED = 'rejected';
+    public const STATUS_PAID = 'paid';
 
     public const STATUS_CANCELLED = 'cancelled';
-
-    public const STATUS_COMPLETED = 'completed';
 
     /**
      * @var list<string>
      */
     public const STATUSES = [
         self::STATUS_DRAFT,
-        self::STATUS_PENDING_SUPPLIER_CONFIRMATION,
-        self::STATUS_CONFIRMED,
-        self::STATUS_REJECTED,
+        self::STATUS_ISSUED,
+        self::STATUS_VOIDED,
+        self::STATUS_PAID,
         self::STATUS_CANCELLED,
-        self::STATUS_COMPLETED,
     ];
 
     /**
-     * Explicit lifecycle transition matrix.
+     * Transition matrix.
      *
-     * draft → pending_supplier_confirmation | cancelled
-     * pending_supplier_confirmation → confirmed | rejected | cancelled
-     * confirmed → completed
-     * rejected / cancelled / completed → (terminal)
+     * draft → issued | cancelled
+     * issued → voided
+     * paid is reserved for future payment integration (unreachable via public APIs)
+     * voided / cancelled / paid → terminal
      *
      * @var array<string, list<string>>
      */
     public const TRANSITIONS = [
         self::STATUS_DRAFT => [
-            self::STATUS_PENDING_SUPPLIER_CONFIRMATION,
+            self::STATUS_ISSUED,
             self::STATUS_CANCELLED,
         ],
-        self::STATUS_PENDING_SUPPLIER_CONFIRMATION => [
-            self::STATUS_CONFIRMED,
-            self::STATUS_REJECTED,
-            self::STATUS_CANCELLED,
+        self::STATUS_ISSUED => [
+            self::STATUS_VOIDED,
         ],
-        self::STATUS_CONFIRMED => [
-            self::STATUS_COMPLETED,
-        ],
-        self::STATUS_REJECTED => [],
+        self::STATUS_VOIDED => [],
+        self::STATUS_PAID => [],
         self::STATUS_CANCELLED => [],
-        self::STATUS_COMPLETED => [],
     ];
 
     /**
@@ -75,52 +66,21 @@ class PurchaseOrder extends Model
             'tax_amount' => 'decimal:2',
             'subtotal' => 'decimal:2',
             'total' => 'decimal:2',
-            'submitted_at' => 'datetime',
-            'confirmed_at' => 'datetime',
-            'rejected_at' => 'datetime',
+            'buyer_snapshot' => 'array',
+            'supplier_snapshot' => 'array',
+            'issued_at' => 'datetime',
             'cancelled_at' => 'datetime',
-            'completed_at' => 'datetime',
+            'voided_at' => 'datetime',
+            'paid_at' => 'datetime',
         ];
     }
 
     /**
-     * @return BelongsTo<Negotiation, $this>
+     * @return BelongsTo<PurchaseOrder, $this>
      */
-    public function negotiation(): BelongsTo
+    public function purchaseOrder(): BelongsTo
     {
-        return $this->belongsTo(Negotiation::class);
-    }
-
-    /**
-     * @return BelongsTo<NegotiationOffer, $this>
-     */
-    public function acceptedOffer(): BelongsTo
-    {
-        return $this->belongsTo(NegotiationOffer::class, 'accepted_offer_id');
-    }
-
-    /**
-     * @return BelongsTo<Quotation, $this>
-     */
-    public function quotation(): BelongsTo
-    {
-        return $this->belongsTo(Quotation::class);
-    }
-
-    /**
-     * @return BelongsTo<Rfq, $this>
-     */
-    public function rfq(): BelongsTo
-    {
-        return $this->belongsTo(Rfq::class);
-    }
-
-    /**
-     * @return BelongsTo<RfqDistribution, $this>
-     */
-    public function distribution(): BelongsTo
-    {
-        return $this->belongsTo(RfqDistribution::class, 'rfq_distribution_id');
+        return $this->belongsTo(PurchaseOrder::class);
     }
 
     /**
@@ -140,19 +100,11 @@ class PurchaseOrder extends Model
     }
 
     /**
-     * @return HasMany<PurchaseOrderItem, $this>
+     * @return HasMany<InvoiceItem, $this>
      */
     public function items(): HasMany
     {
-        return $this->hasMany(PurchaseOrderItem::class)->orderBy('sort_order')->orderBy('id');
-    }
-
-    /**
-     * @return HasOne<Invoice, $this>
-     */
-    public function invoice(): HasOne
-    {
-        return $this->hasOne(Invoice::class);
+        return $this->hasMany(InvoiceItem::class)->orderBy('sort_order')->orderBy('id');
     }
 
     public function isDraft(): bool
@@ -162,7 +114,11 @@ class PurchaseOrder extends Model
 
     public function isCommerciallyImmutable(): bool
     {
-        return $this->status !== self::STATUS_DRAFT;
+        return in_array($this->status, [
+            self::STATUS_ISSUED,
+            self::STATUS_VOIDED,
+            self::STATUS_PAID,
+        ], true);
     }
 
     /**
@@ -176,23 +132,17 @@ class PurchaseOrder extends Model
     public function transitionTo(string $to): void
     {
         if (! in_array($to, $this->allowedTransitions(), true)) {
-            throw new InvalidArgumentException("Invalid purchase order lifecycle transition from {$this->status} to {$to}.");
+            throw new InvalidArgumentException("Invalid invoice lifecycle transition from {$this->status} to {$to}.");
         }
 
-        if ($to === self::STATUS_PENDING_SUPPLIER_CONFIRMATION) {
-            $this->submitted_at = now();
-        }
-        if ($to === self::STATUS_CONFIRMED) {
-            $this->confirmed_at = now();
-        }
-        if ($to === self::STATUS_REJECTED) {
-            $this->rejected_at = now();
+        if ($to === self::STATUS_ISSUED) {
+            $this->issued_at = now();
         }
         if ($to === self::STATUS_CANCELLED) {
             $this->cancelled_at = now();
         }
-        if ($to === self::STATUS_COMPLETED) {
-            $this->completed_at = now();
+        if ($to === self::STATUS_VOIDED) {
+            $this->voided_at = now();
         }
 
         $this->status = $to;
@@ -200,8 +150,8 @@ class PurchaseOrder extends Model
     }
 
     /**
-     * @param  Builder<PurchaseOrder>  $query
-     * @return Builder<PurchaseOrder>
+     * @param  Builder<Invoice>  $query
+     * @return Builder<Invoice>
      */
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
@@ -229,11 +179,8 @@ class PurchaseOrder extends Model
         return [
             'id' => $this->id,
             'number' => $this->number,
-            'negotiation_id' => $this->negotiation_id,
-            'accepted_offer_id' => $this->accepted_offer_id,
-            'quotation_id' => $this->quotation_id,
-            'rfq_id' => $this->rfq_id,
-            'rfq_distribution_id' => $this->rfq_distribution_id,
+            'purchase_order_id' => $this->purchase_order_id,
+            'purchase_order_number' => $this->purchase_order_number,
             'status' => $this->status,
             'currency' => $this->currency,
             'shipping_amount' => (string) $this->shipping_amount,
@@ -241,7 +188,8 @@ class PurchaseOrder extends Model
             'subtotal' => (string) $this->subtotal,
             'total' => (string) $this->total,
             'notes' => $this->notes,
-            'rejection_reason' => $this->rejection_reason,
+            'cancellation_reason' => $this->cancellation_reason,
+            'void_reason' => $this->void_reason,
             'buyer_company' => [
                 'id' => $this->buyer_company_id,
                 'name' => $this->buyerCompany?->name,
@@ -251,12 +199,13 @@ class PurchaseOrder extends Model
                 'name' => $this->supplierCompany?->name,
                 'display_name' => $this->supplierCompany?->supplierProfile?->display_name,
             ],
-            'items' => $this->items->map(fn (PurchaseOrderItem $item) => $item->toApiArray())->values()->all(),
-            'submitted_at' => $this->submitted_at?->toISOString(),
-            'confirmed_at' => $this->confirmed_at?->toISOString(),
-            'rejected_at' => $this->rejected_at?->toISOString(),
+            'buyer_snapshot' => $this->buyer_snapshot,
+            'supplier_snapshot' => $this->supplier_snapshot,
+            'items' => $this->items->map(fn (InvoiceItem $item) => $item->toApiArray())->values()->all(),
+            'issued_at' => $this->issued_at?->toISOString(),
             'cancelled_at' => $this->cancelled_at?->toISOString(),
-            'completed_at' => $this->completed_at?->toISOString(),
+            'voided_at' => $this->voided_at?->toISOString(),
+            'paid_at' => $this->paid_at?->toISOString(),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];

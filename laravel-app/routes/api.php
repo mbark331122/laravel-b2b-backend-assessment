@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BankChangeRequestController;
 use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\BuyerQuotationController;
+use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\NegotiationController;
 use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
@@ -89,6 +90,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/purchase-orders/{purchaseOrder}/submit', [PurchaseOrderController::class, 'submit']);
     Route::post('/purchase-orders/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel']);
     Route::post('/purchase-orders/{purchaseOrder}/complete', [PurchaseOrderController::class, 'complete']);
+    Route::post('/purchase-orders/{purchaseOrder}/invoice', [InvoiceController::class, 'store']);
+    Route::get('/purchase-orders/{purchaseOrder}/invoice', [InvoiceController::class, 'showForPurchaseOrder']);
+
+    Route::get('/invoices', [InvoiceController::class, 'index']);
+    Route::get('/invoices/{invoice}', [InvoiceController::class, 'show']);
+    Route::post('/invoices/{invoice}/issue', [InvoiceController::class, 'issue']);
+    Route::post('/invoices/{invoice}/cancel', [InvoiceController::class, 'cancel']);
+    Route::post('/invoices/{invoice}/void', [InvoiceController::class, 'void']);
 
     Route::get('/supplier/negotiations', [NegotiationController::class, 'indexForSupplier']);
     Route::get('/supplier/negotiations/{negotiation}', [NegotiationController::class, 'show']);
@@ -98,6 +107,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/supplier/purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'show']);
     Route::post('/supplier/purchase-orders/{purchaseOrder}/confirm', [PurchaseOrderController::class, 'confirm']);
     Route::post('/supplier/purchase-orders/{purchaseOrder}/reject', [PurchaseOrderController::class, 'reject']);
+
+    Route::get('/supplier/invoices', [InvoiceController::class, 'indexForSupplier']);
+    Route::get('/supplier/invoices/{invoice}', [InvoiceController::class, 'show']);
 
     Route::get('/product-categories', [ProductCategoryController::class, 'index']);
     Route::get('/brands', [BrandController::class, 'index']);

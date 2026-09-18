@@ -72,6 +72,14 @@ class AuditLog extends Model
 
     public const PURCHASE_ORDER_COMPLETED = 'purchase_order.completed';
 
+    public const INVOICE_CREATED = 'invoice.created';
+
+    public const INVOICE_ISSUED = 'invoice.issued';
+
+    public const INVOICE_CANCELLED = 'invoice.cancelled';
+
+    public const INVOICE_VOIDED = 'invoice.voided';
+
     public const RFQ_APPROVED = 'rfq.approved';
 
     public const PROPOSAL_CREATED = 'proposal.created';

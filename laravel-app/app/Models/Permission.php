@@ -73,6 +73,16 @@ class Permission extends Model
 
     public const PURCHASE_ORDER_COMPLETE = 'purchase_order.complete';
 
+    public const INVOICE_READ = 'invoice.read';
+
+    public const INVOICE_CREATE = 'invoice.create';
+
+    public const INVOICE_ISSUE = 'invoice.issue';
+
+    public const INVOICE_CANCEL = 'invoice.cancel';
+
+    public const INVOICE_VOID = 'invoice.void';
+
     public const BANK_READ = 'bank.read';
 
     public const BANK_CHANGE_REQUEST = 'bank.change_request';
@@ -140,6 +150,11 @@ class Permission extends Model
             self::PURCHASE_ORDER_CONFIRM,
             self::PURCHASE_ORDER_REJECT,
             self::PURCHASE_ORDER_COMPLETE,
+            self::INVOICE_READ,
+            self::INVOICE_CREATE,
+            self::INVOICE_ISSUE,
+            self::INVOICE_CANCEL,
+            self::INVOICE_VOID,
             self::BANK_READ,
             self::BANK_CHANGE_REQUEST,
             self::BANK_APPROVE,
@@ -186,6 +201,7 @@ class Permission extends Model
             self::PURCHASE_ORDER_SUBMIT,
             self::PURCHASE_ORDER_CANCEL,
             self::PURCHASE_ORDER_COMPLETE,
+            self::INVOICE_READ,
             self::BANK_READ,
             self::BANK_CHANGE_REQUEST,
             self::PRODUCT_READ,
@@ -226,6 +242,11 @@ class Permission extends Model
             self::PURCHASE_ORDER_READ,
             self::PURCHASE_ORDER_CONFIRM,
             self::PURCHASE_ORDER_REJECT,
+            self::INVOICE_READ,
+            self::INVOICE_CREATE,
+            self::INVOICE_ISSUE,
+            self::INVOICE_CANCEL,
+            self::INVOICE_VOID,
         ];
     }
 
