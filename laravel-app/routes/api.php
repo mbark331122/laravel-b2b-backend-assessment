@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BankChangeRequestController;
 use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\BuyerQuotationController;
+use App\Http\Controllers\Api\DeliveryConfirmationController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\NegotiationController;
 use App\Http\Controllers\Api\PaymentController;
@@ -117,6 +118,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/shipments/{shipment}/ship', [ShipmentController::class, 'ship']);
     Route::post('/shipments/{shipment}/deliver', [ShipmentController::class, 'deliver']);
     Route::post('/shipments/{shipment}/cancel', [ShipmentController::class, 'cancel']);
+    Route::post('/shipments/{shipment}/delivery-confirmation', [DeliveryConfirmationController::class, 'store']);
+    Route::get('/shipments/{shipment}/delivery-confirmation', [DeliveryConfirmationController::class, 'showForShipment']);
+
+    Route::get('/delivery-confirmations', [DeliveryConfirmationController::class, 'index']);
+    Route::get('/delivery-confirmations/{deliveryConfirmation}', [DeliveryConfirmationController::class, 'show']);
 
     Route::get('/supplier/negotiations', [NegotiationController::class, 'indexForSupplier']);
     Route::get('/supplier/negotiations/{negotiation}', [NegotiationController::class, 'show']);
@@ -135,6 +141,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/supplier/shipments', [ShipmentController::class, 'indexForSupplier']);
     Route::get('/supplier/shipments/{shipment}', [ShipmentController::class, 'show']);
+
+    Route::get('/supplier/delivery-confirmations', [DeliveryConfirmationController::class, 'indexForSupplier']);
+    Route::get('/supplier/delivery-confirmations/{deliveryConfirmation}', [DeliveryConfirmationController::class, 'show']);
 
     Route::get('/product-categories', [ProductCategoryController::class, 'index']);
     Route::get('/brands', [BrandController::class, 'index']);

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use InvalidArgumentException;
 
 #[Fillable([])]
@@ -104,6 +105,14 @@ class Shipment extends Model
     public function items(): HasMany
     {
         return $this->hasMany(ShipmentItem::class)->orderBy('sort_order')->orderBy('id');
+    }
+
+    /**
+     * @return HasOne<DeliveryConfirmation, $this>
+     */
+    public function deliveryConfirmation(): HasOne
+    {
+        return $this->hasOne(DeliveryConfirmation::class);
     }
 
     public function isPending(): bool

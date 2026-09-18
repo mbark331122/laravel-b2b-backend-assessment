@@ -107,6 +107,10 @@ class Permission extends Model
 
     public const SHIPMENT_CANCEL = 'shipment.cancel';
 
+    public const DELIVERY_CONFIRMATION_READ = 'delivery_confirmation.read';
+
+    public const DELIVERY_CONFIRMATION_CREATE = 'delivery_confirmation.create';
+
     public const BANK_READ = 'bank.read';
 
     public const BANK_CHANGE_REQUEST = 'bank.change_request';
@@ -191,6 +195,8 @@ class Permission extends Model
             self::SHIPMENT_SHIP,
             self::SHIPMENT_DELIVER,
             self::SHIPMENT_CANCEL,
+            self::DELIVERY_CONFIRMATION_READ,
+            self::DELIVERY_CONFIRMATION_CREATE,
             self::BANK_READ,
             self::BANK_CHANGE_REQUEST,
             self::BANK_APPROVE,
@@ -242,6 +248,8 @@ class Permission extends Model
             self::PAYMENT_CREATE,
             self::PAYMENT_CANCEL,
             self::SHIPMENT_READ,
+            self::DELIVERY_CONFIRMATION_READ,
+            self::DELIVERY_CONFIRMATION_CREATE,
             self::BANK_READ,
             self::BANK_CHANGE_REQUEST,
             self::PRODUCT_READ,
@@ -297,6 +305,7 @@ class Permission extends Model
             self::SHIPMENT_SHIP,
             self::SHIPMENT_DELIVER,
             self::SHIPMENT_CANCEL,
+            self::DELIVERY_CONFIRMATION_READ,
         ];
     }
 
