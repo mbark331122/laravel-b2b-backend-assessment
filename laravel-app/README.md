@@ -1,8 +1,10 @@
 # Laravel Mini B2B Backend
 
-Assessment backend for multi-tenant RFQs, mocked AI extraction with human approval, supplier bank-change approval, and auditability.
+B2B procurement and supplier commerce API (multi-tenant). Current codebase includes identity/tenancy, supplier profiles, wholesale product catalog, RFQs, supplier matching & distribution, quotations, negotiation with immutable counter-offers, purchase orders with supplier confirmation, commercial invoices (snapshotted from confirmed POs), payment foundation (manual lifecycle, no gateway), shipping & fulfillment foundation (one shipment per confirmed PO, no carrier APIs), buyer delivery confirmation (immutable receipt acknowledgment), returns/RMA foundation (buyer request + supplier review; no refunds), RMA return logistics (return shipments for approved RMAs; no carrier APIs), mocked AI extraction with human approval, supplier bank-change approval, and auditability — with a fixed sprint roadmap for the full commercial lifecycle.
 
 There is no frontend. The API is the product.
+
+**Sprint 0 architecture docs:** [`docs/sprint-0/`](docs/sprint-0/)
 
 ## Architecture
 
@@ -10,11 +12,33 @@ This is a single Laravel 13 API application.
 
 **Auth.** Laravel Sanctum issues API tokens. Login does not accept `company_id`. Tenant context is taken from the authenticated user (or from the owned resource for admin actions).
 
-**Tenancy.** `Company` is the tenant. Company users have a `company_id`. Admin has no company and can operate across tenants when a permission allows it. Queries and policies scope company users to their own company.
+**Tenancy.** `Company` is the tenant. Companies are classified with `is_buyer` / `is_supplier` (set only by trusted backend/seeders — not client input). Company users have a `company_id`. Admin has no company and can operate across tenants when a permission allows it. Queries and policies scope company users to their own company. RFQ creation additionally requires a buyer company.
 
-**Authorization.** Roles (`admin`, `company_user`) own permissions. Policies enforce permission + tenant on every sensitive operation.
+**Authorization.** Roles (`admin`, `company_user`, `supplier_user`) own permissions. Policies enforce permission + tenant (and buyer/supplier classification) on every sensitive operation.
 
-**RFQ.** Official RFQ rows are the system of record. Company users can create, read, and update their own RFQs. They cannot approve AI proposals.
+**Catalog.** Supplier companies own a `SupplierProfile` and wholesale `Product` rows (brand, specs, MOQ/max/increment, base price + tiers, lifecycle). Buyers may browse/view **published** products only. New supplier products start as `draft` and require lifecycle review before publication. Product ownership always comes from the authenticated supplier company — never from client `company_id` / `supplier_id` / `tenant_id`.
+
+**RFQ.** Official RFQ rows are the system of record for buyer demand. Buyer companies create draft RFQs (legacy commodity fields remain supported for AI enrichment), attach line items with optional published-product snapshots, then submit/cancel/close through controlled transitions. Submitted RFQs are immutable via normal update/item endpoints.
+
+**Supplier matching & distribution.** Buyers discover eligible suppliers (`GET /api/supplier-profiles`) and preview deterministic matches for a submitted RFQ (`GET /api/rfqs/{rfq}/suppliers`). Matching uses structured catalog data only (published products overlapping RFQ product IDs and/or categories) — no AI, scores, or reputation ranking. Results are ordered by `display_name`, then `id`. Buyers distribute to selected eligible suppliers (`POST /api/rfqs/{rfq}/distributions`). Distribution lifecycle: `pending` / `sent` / `withdrawn` (server-controlled). Deduplication: unique `(rfq_id, supplier_company_id)`; withdrawing then redistributing reactivates the same row. Suppliers may **read** only RFQs explicitly distributed to their company (`GET /api/supplier/rfqs`).
+
+**Quotations.** Suppliers create draft quotations against an **active** distribution for their own company (`POST /api/supplier/rfq-distributions/{distribution}/quotation`). Lifecycle: `draft` → `submitted` → `withdrawn` | `expired`. Totals are server-calculated (`line_total = qty × unit_price`, `subtotal = Σ line_total`, `total = subtotal + shipping + tax`). Client-provided totals are ignored. At most one active (`draft`/`submitted`) quotation per distribution via `active_lock`; withdrawn/expired rows are not reused — a new draft may be created. Submitted quotes become immutable; expiration is evaluated on read when `valid_until` is past (no scheduler required). Buyers list/compare non-draft quotations on their own RFQs. Comparison is neutral (no score, rank, or winner).
+
+**Negotiation.** Participants open a negotiation against an active submitted quotation (`POST /api/quotations/{quotation}/negotiation`). An immutable initial offer (sequence 1, supplier side) is snapshotted from the quotation. Counter-offers are append-only (`POST /api/negotiations/{negotiation}/offers`) with server-enforced alternating turns. Offers cannot be edited or deleted. Lifecycle: `open` → `accepted` | `rejected` | `withdrawn` | `expired`. Acceptance is by the opposite party on the latest proposed unexpired offer (transaction + row locks). Original quotation is never mutated. No ranking or automatic winner selection.
+
+**Purchase Orders.** Buyers create a PO only from an **accepted** negotiation (`POST /api/negotiations/{negotiation}/purchase-order`). Commercial terms are snapshotted from the accepted offer (immutable). One PO per negotiation (unique `negotiation_id`); idempotent re-create returns the existing PO. Server-generated unique `number` (`PO-{YEAR}-{id}`). Lifecycle: `draft` → `pending_supplier_confirmation` → `confirmed` → `completed` (or `rejected` / `cancelled`). Supplier confirms/rejects after submit; buyer cancels while draft/pending; buyer completes confirmed POs.
+
+**Commercial Invoices.** Suppliers create an invoice only from a **confirmed** purchase order (`POST /api/purchase-orders/{purchaseOrder}/invoice`). Commercial values are snapshotted from the confirmed PO (immutable after create). One invoice per PO (unique `purchase_order_id`); idempotent re-create returns the existing invoice. Server-generated unique `number` (`INV-{YEAR}-{id}`). Lifecycle: `draft` → `issued` | `cancelled`; `issued` → `voided` | `paid` (`paid` only via payment mark-paid). No ZATCA, tax engines, credit notes, refunds, shipping, or fulfillment.
+
+**Payments (foundation).** Buyers create a payment only for an **issued** invoice (`POST /api/invoices/{invoice}/payment`). Amount and currency are taken from the invoice total (client amounts ignored). Server-generated unique `number` (`PAY-{YEAR}-{id}`). Methods: `bank_transfer` / `cash` / `manual` (provider-independent labels only). Lifecycle: `pending` → `paid` | `failed` | `cancelled`. At most one pending payment per invoice (`active_lock`); after failed/cancelled a new payment may be created; a paid invoice cannot receive another payment. Supplier marks paid/failed (manual bookkeeping); buyer may cancel pending. Marking paid also transitions the invoice to `paid`. **No payment gateway, webhooks, wallets, bank APIs, refunds, or partial payments.**
+
+**Shipments (fulfillment foundation).** Suppliers create a shipment only from a **confirmed** purchase order (`POST /api/purchase-orders/{purchaseOrder}/shipment`). One shipment per PO (unique `purchase_order_id`); idempotent re-create returns the existing shipment. Server-generated unique `number` (`SHP-{YEAR}-{id}`). Line items and commercial values are snapshotted from the confirmed PO (full qty; no partial/split shipments). Immutable origin/destination address snapshots. Carrier / tracking / shipping_method are manual informational fields only. Lifecycle: `pending` → `processing` → `shipped` → `delivered`, or `pending`/`processing` → `cancelled`. Operational metadata updatable only while `pending`/`processing`. Independent of payment state. **No carrier APIs, tracking webhooks, warehouses, inventory, packages, or rate calculation.**
+
+**Delivery Confirmation.** Buyers confirm receipt only for a **delivered** shipment (`POST /api/shipments/{shipment}/delivery-confirmation`). One confirmation per shipment (unique `shipment_id`); idempotent re-create returns the existing confirmation. Server-generated unique `number` (`DEL-{YEAR}-{id}`). Status is always `confirmed` and immutable (no update/delete/cancel). Does **not** auto-complete the PO, mark the invoice paid, create a payment, or create another shipment. Independent of payment status. Supplier may read related confirmations only. **No returns, RMA, disputes, refunds, ratings, or escrow.**
+
+**Returns / RMA.** Buyers create an RMA only for a **delivered** shipment that already has a delivery confirmation (`POST /api/shipments/{shipment}/rma`). One **active** RMA per shipment (`active_lock`); a new RMA may be created only after the previous reaches `rejected` / `cancelled` / `closed`. Server-generated unique `number` (`RMA-{YEAR}-{id}`). Items snapshot shipment lines; return qty must be > 0 and ≤ shipped qty. Lifecycle: `requested` → `approved`|`rejected`|`cancelled`; `approved` → `received` → `closed`. Buyer cancels while requested; supplier approves/rejects/receives/closes. Does **not** refund payments, create credit notes, modify invoices/payments, change inventory, or create return shipments automatically.
+
+**RMA Return Logistics.** Buyers create a return shipment only for an **approved** RMA (`POST /api/rmas/{rma}/return-shipment`). One **active** return shipment per RMA (`active_lock`). Server-generated unique `number` (`RMA-RET-{YEAR}-{id}`). Items must belong to the RMA; qty ≤ RMA item qty; price snapshots from original shipment lines. Origin = buyer return address; destination = supplier. Lifecycle: `pending` → `shipped` → `delivered`, or `pending`/`shipped` → `cancelled`. Buyer updates logistics while pending and may cancel; supplier marks shipped/delivered. Does **not** auto-mark RMA received/closed, refund, or change inventory. **No carrier APIs or tracking webhooks.**
 
 **AI.** `MockAiExtractor` parses text only. It never receives or writes an RFQ. `AiExtractionService` stores an extraction and, when a field differs, a pending `RfqProposal`. Official RFQ fields change only in `RfqProposal::approve()`, using the stored proposed value.
 
@@ -50,13 +74,17 @@ Tests use an in-memory SQLite database (`phpunit.xml`). They do not need the fil
 
 ### Seeded credentials (development only)
 
-| User | Email | Password | Company | Role |
-| --- | --- | --- | --- | --- |
-| User A | user.a@example.com | password | Company A | company_user |
-| User B | user.b@example.com | password | Company B | company_user |
-| Admin User | admin@example.com | password | none | admin |
+| User | Email | Password | Company | Classification | Role |
+| --- | --- | --- | --- | --- | --- |
+| User A | user.a@example.com | password | Company A | buyer | company_user |
+| User B | user.b@example.com | password | Company B | buyer | company_user |
+| Supplier User | supplier.user@example.com | password | Supplier Company | supplier | supplier_user |
+| Supplier User B | supplier.user.b@example.com | password | Supplier Company B | supplier | supplier_user |
+| Admin User | admin@example.com | password | none | none | admin |
 
-Seeded suppliers: Supplier A (Company A) and Supplier B (Company B), each with one active bank account.
+Seeded bank records: Supplier A (Company A) and Supplier B (Company B), each with one active bank account (banking workflow — distinct from catalog `SupplierProfile`).
+
+Seeded catalog: brands Al Osra/GrainCo; categories Sugar/Grains; published + archived + draft products; specs and price tiers on published sugar.
 
 ### Auth
 
@@ -69,12 +97,38 @@ Seeded suppliers: Supplier A (Company A) and Supplier B (Company B), each with o
 ```
 Company 1──* User
 Company 1──* Rfq
-Company 1──* Supplier
+Company 1──* Supplier                 # bank workflow record (buyer-tenant owned)
+Company 1──1 SupplierProfile          # catalog supplier identity (supplier-tenant)
+Company 1──* Product
+Brand 1──* Product                    # platform-level brands
+ProductCategory 1──* Product
+Product 1──* ProductSpecification
+Product 1──* ProductPriceTier
 Role 1──* User
 Role *──* Permission
 
 Rfq 1──* AiExtraction
 Rfq 1──* RfqProposal
+Rfq 1──* RfqDistribution
+RfqDistribution → supplier Company + SupplierProfile
+Rfq 1──* Quotation
+RfqDistribution 1──* Quotation
+Quotation 1──* QuotationItem → RfqItem
+Quotation 1──* Negotiation
+Negotiation 1──* NegotiationOffer (append-only)
+NegotiationOffer 1──* NegotiationOfferItem → RfqItem
+Negotiation 1──1 PurchaseOrder
+PurchaseOrder 1──* PurchaseOrderItem
+PurchaseOrder 1──1 Invoice
+Invoice 1──* InvoiceItem
+Invoice 1──* Payment
+PurchaseOrder 1──1 Shipment
+Shipment 1──* ShipmentItem
+Shipment 1──1 DeliveryConfirmation
+Shipment 1──* Rma
+Rma 1──* RmaItem
+Rma 1──* ReturnShipment
+ReturnShipment 1──* ReturnShipmentItem
 AiExtraction 1──* RfqProposal
 
 Supplier 1──1 SupplierBankAccount
@@ -84,13 +138,36 @@ SupplierBankAccount 1──* BankAccountHistory
 AuditLog → actor (User), company (Company), auditable (morph)
 ```
 
-- **Companies** — tenants. Seeded: Company A, Company B.
-- **Users** — `company_id` nullable (admin is null). `role_id` required. `company_id` / `role_id` are not fillable.
-- **Roles / Permissions** — `admin` has all permissions. `company_user` has operational RFQ/bank permissions, not `rfq.approve` or `bank.approve`.
-- **RFQs** — official commodity, specification, quantity, unit, incoterm, destination, status (`draft`), `company_id`.
+- **Companies** — tenants with buyer/supplier classification (`is_buyer`, `is_supplier`). Seeded: Company A/B (buyer), Supplier Company / Supplier Company B (supplier).
+- **Users** — `company_id` nullable (admin is null). `role_id` required. `company_id` / `role_id` are not fillable. Classification is read from the user's company.
+- **Roles / Permissions** — `admin` has all permissions. `company_user` has buyer RFQ/quotation/negotiation permissions plus `purchase_order.read|create|submit|cancel|complete`, `invoice.read`, `payment.read|create|cancel`, `shipment.read`, `delivery_confirmation.read|create`, `rma.read|create|cancel`, and `return_shipment.read|create|update|cancel`. `supplier_user` has catalog/quotation/negotiation permissions plus `purchase_order.read|confirm|reject`, `invoice.read|create|issue|cancel|void`, `payment.read|mark_paid|mark_failed`, `shipment.read|create|update|process|ship|deliver|cancel`, `delivery_confirmation.read`, `rma.read|approve|reject|receive|close`, and `return_shipment.read|ship|deliver`. Platform-only: `brand.create`, `product.review`.
+- **Supplier Profiles** — one profile per supplier company (`display_name`, description, contact, status). Buyer discovery via `GET /api/supplier-profiles` returns only eligible suppliers (`status=active` + `company.is_supplier=true`), filterable by `q`, `product_category_id`, `brand_id`, `product_q`.
+- **Brands** — platform-level (`name`, `slug`, status). Readable with `product.read`; create requires `brand.create`.
+- **Product Categories** — platform-level categories (`name`, status).
+- **Products** — wholesale catalog owned by supplier `company_id` + `supplier_profile_id`: name, sku, description, category, brand, unit, MOQ, maximum_order_quantity, quantity_increment, wholesale_price, currency, lifecycle status (`draft` / `pending_review` / `approved` / `published` / `rejected` / `archived`). Nested specs + price tiers. Buyers see `published` only.
+- **RFQs** — buyer-owned demand records: title/description, legacy commodity fields (AI), destination/incoterm/currency/required_by_date, lifecycle (`draft` / `submitted` / `cancelled` / `closed`), `company_id`.
+- **RFQ Items** — line items with quantity/unit, optional target price, optional published `product_id` + immutable `product_snapshot` JSON.
+- **RFQ Distributions** — buyer→supplier distribution rows: `rfq_id`, `supplier_company_id`, `supplier_profile_id`, status (`pending` / `sent` / `withdrawn`), `distributed_at` / `withdrawn_at`. Unique per `(rfq_id, supplier_company_id)`. Reactivate-on-withdraw (no duplicate active rows).
+- **Quotations** — supplier offers on a distribution: currency, `valid_until`, notes, shipping/tax, server totals, lifecycle (`draft` / `submitted` / `withdrawn` / `expired`). Ownership = authenticated supplier company. `active_lock` enforces one active quotation per distribution.
+- **Quotation Items** — map 1:1 to RFQ items with quantity, unit price, server `line_total`, snapshot JSON captured at create time.
+- **Negotiations** — one open negotiation per quotation (`active_lock`); participants = RFQ buyer company + quotation supplier company; lifecycle `open` / `accepted` / `rejected` / `withdrawn` / `expired`.
+- **Negotiation Offers** — append-only sequenced offers (`buyer`/`supplier` side); statuses `proposed` / `superseded` / `accepted`; immutable after create.
+- **Negotiation Offer Items** — historical commercial lines with snapshots; server-calculated totals.
+- **Purchase Orders** — one per accepted negotiation; unique `number`; snapshotted currency/totals/items from accepted offer; lifecycle `draft` / `pending_supplier_confirmation` / `confirmed` / `rejected` / `cancelled` / `completed`.
+- **Purchase Order Items** — immutable commercial snapshots (not live Product/Quotation joins).
+- **Invoices** — one per confirmed PO; unique `number`; snapshotted buyer/supplier/currency/totals from the PO; lifecycle `draft` / `issued` / `voided` / `paid` (via payment mark-paid) / `cancelled`.
+- **Invoice Items** — immutable line snapshots from PO items (not live Product/PO joins after create).
+- **Payments** — buyer-created against issued invoices; amount = invoice.total; unique `number`; methods `bank_transfer` / `cash` / `manual`; lifecycle `pending` / `paid` / `failed` / `cancelled`; one pending per invoice via `active_lock`.
+- **Shipments** — one per confirmed PO; unique `number`; PO item snapshots; origin/destination address snapshots; lifecycle `pending` / `processing` / `shipped` / `delivered` / `cancelled`.
+- **Shipment Items** — immutable fulfillment line snapshots from confirmed PO items (full quantity; no partials).
+- **Delivery Confirmations** — one per delivered shipment; unique `number`; buyer-created immutable `confirmed` record; does not mutate PO/invoice/payment.
+- **RMAs** — buyer-created against delivered+confirmed shipments; unique `number`; one active RMA per shipment; lifecycle `requested` / `approved` / `rejected` / `received` / `closed` / `cancelled`.
+- **RMA Items** — immutable snapshots from shipment items with validated return quantities.
+- **Return Shipments** — buyer-created logistics for approved RMAs; unique `number`; one active per RMA; lifecycle `pending` / `shipped` / `delivered` / `cancelled`.
+- **Return Shipment Items** — immutable snapshots from RMA/shipment items with validated quantities and price snapshots.
 - **AI Extractions** — proposed fields, confidence, source (`AI/mock`), status. Belongs to an RFQ. Does not replace the official RFQ.
 - **RFQ Proposals** — field-level conflict: current value, proposed value, source, confidence, status (`pending` / `approved` / `rejected`).
-- **Suppliers** — minimal tenant-owned record for bank data.
+- **Suppliers** — minimal tenant-owned record for bank data (not the catalog profile).
 - **Supplier Bank Accounts** — official beneficiary, bank name, IBAN, status (`active`). IBAN is not fillable.
 - **Bank Change Requests** — current IBAN, proposed IBAN, requester, company (copied from supplier), status.
 - **Bank Account History** — snapshot of the official account taken on approval, before the IBAN is overwritten.
@@ -104,7 +181,18 @@ Tenant context is never taken from a client `company_id`.
 - For read/update/approve: the resource’s stored company is compared to the authenticated user’s company. Admin skips the company check after permission succeeds.
 - List queries use `visibleTo($user)` so company users only see their tenant.
 - Cross-tenant access uses `denyAsNotFound()` (`404`) so the API does not confirm that another company’s resource exists. Missing permission on your own tenant is `403`.
-- Extra body/query IDs (`company_id`, `rfq_id`, `supplier_id`, `bank_account_id`) are ignored for assignment.
+- Extra body/query IDs (`company_id`, `rfq_id`, `supplier_id`, `supplier_company_id`, `bank_account_id`, `tenant_id`) are ignored for assignment.
+- Supplier RFQ visibility requires an **active** distribution to the authenticated supplier company. Suppliers cannot browse buyer RFQ lists (`GET /api/rfqs` remains buyer permission `rfq.read`).
+- Eligible suppliers for discovery/distribution are resolved server-side (`is_supplier`, active profile, published catalog match). Client-supplied supplier classification is never trusted.
+- Quotation ownership is the authenticated supplier company. Buyers only see non-draft quotations on RFQs they own. Spoofed `supplier_id` / `company_id` / `tenant_id` / `rfq_distribution_id` are ignored.
+- Negotiation participants and turn side are resolved server-side from RFQ/quotation ownership. Client `side` / `party` / company IDs are ignored. Historical offers have no update/delete routes.
+- Purchase order relationships and totals are derived from the accepted negotiation/offer. Client relationship IDs and money fields are ignored. Draft POs are buyer-only until submitted.
+- Invoice relationships and totals are derived from the confirmed PO. Client `company_id` / buyer/supplier IDs / `number` / money fields / status are ignored. Buyers read only their company invoices; suppliers create/issue/cancel/void only their own.
+- Payment relationships, amount, and currency are derived from the issued invoice. Client ownership IDs / `number` / amount / currency / status are ignored. Buyers create/cancel; suppliers mark paid/failed; neither side accesses another company’s payments.
+- Shipment relationships and line items are derived from the confirmed PO. Client ownership IDs / `number` / status / item qty/prices are ignored. Suppliers create and transition; buyers read only. Address snapshots are historical shipping data, not ownership.
+- Delivery confirmation relationships and confirming user are derived from the delivered shipment and authenticated buyer. Client ownership IDs / `number` / status / `confirmed_at` are ignored. Immutable after create.
+- RMA relationships and items are derived from the delivered shipment + delivery confirmation. Client ownership IDs / `number` / status / product IDs are ignored. Buyer creates/cancels; supplier reviews. Does not mutate shipment/PO/invoice/payment.
+- Return shipment relationships and items are derived from the approved RMA. Client ownership IDs / `number` / status are ignored. Buyer creates/updates/cancels; supplier ships/delivers. Does not auto-change RMA/invoice/payment.
 
 ## AI Safety
 
@@ -145,6 +233,24 @@ Important mutations are logged. Reads are not.
 | --- | --- |
 | `rfq.created` | RFQ created |
 | `rfq.updated` | RFQ updated |
+| `rfq.submitted` / `rfq.cancelled` / `rfq.closed` | RFQ lifecycle |
+| `rfq.item.created` / `updated` / `deleted` | RFQ line item mutations |
+| `rfq.distributed` | RFQ distributed to a supplier |
+| `rfq.distribution.withdrawn` | Distribution withdrawn |
+| `quotation.created` / `updated` / `deleted` | Supplier draft quotation mutations |
+| `quotation.submitted` / `withdrawn` | Quotation lifecycle |
+| `quotation.item.created` / `updated` / `deleted` | Quotation line item mutations |
+| `negotiation.created` | Negotiation opened |
+| `negotiation.offer.created` | Offer / counter-offer appended |
+| `negotiation.offer.accepted` | Offer accepted; negotiation closed |
+| `negotiation.rejected` / `withdrawn` | Negotiation terminated |
+| `purchase_order.created` / `submitted` / `confirmed` / `rejected` / `cancelled` / `completed` | PO lifecycle |
+| `invoice.created` / `issued` / `cancelled` / `voided` | Invoice lifecycle |
+| `payment.created` / `marked_paid` / `marked_failed` / `cancelled` | Payment lifecycle |
+| `shipment.created` / `updated` / `processing` / `shipped` / `delivered` / `cancelled` | Shipment lifecycle |
+| `delivery_confirmation.created` | Buyer confirms delivered shipment receipt |
+| `rma.created` / `cancelled` / `approved` / `rejected` / `received` / `closed` | RMA lifecycle |
+| `return_shipment.created` / `updated` / `shipped` / `delivered` / `cancelled` | Return shipment lifecycle |
 | `rfq.approved` | Official RFQ changed by proposal approval |
 | `proposal.created` | A conflicting proposal is stored |
 | `proposal.approved` / `proposal.rejected` | Proposal resolved |
@@ -169,10 +275,25 @@ All routes below except login require `auth:sanctum`.
 | `POST` | `/api/login` | public |
 | `GET` | `/api/me` | authenticated |
 | `POST` | `/api/logout` | authenticated |
-| `GET` | `/api/rfqs` | `rfq.read` |
-| `POST` | `/api/rfqs` | `rfq.create` |
+| `GET` | `/api/rfqs` | `rfq.read` (filters: status, created/updated dates) |
+| `POST` | `/api/rfqs` | `rfq.create` (always `draft`; ownership from auth company) |
 | `GET` | `/api/rfqs/{rfq}` | `rfq.read` |
-| `PUT/PATCH` | `/api/rfqs/{rfq}` | `rfq.update` |
+| `PUT/PATCH` | `/api/rfqs/{rfq}` | `rfq.update` (draft only) |
+| `DELETE` | `/api/rfqs/{rfq}` | `rfq.delete` (draft only) |
+| `POST` | `/api/rfqs/{rfq}/submit` | `rfq.submit` |
+| `POST` | `/api/rfqs/{rfq}/cancel` | `rfq.cancel` |
+| `POST` | `/api/rfqs/{rfq}/close` | `rfq.close` |
+| `GET` | `/api/rfqs/{rfq}/suppliers` | `rfq.distribution.read` (deterministic match preview) |
+| `GET` | `/api/rfqs/{rfq}/distributions` | `rfq.distribution.read` |
+| `POST` | `/api/rfqs/{rfq}/distributions` | `rfq.distribution.create` (submitted RFQs only; body: `supplier_profile_ids[]`) |
+| `POST` | `/api/rfqs/{rfq}/distributions/{distribution}/withdraw` | `rfq.distribution.withdraw` |
+| `GET` | `/api/rfqs/{rfq}/quotations` | `quotation.read` (non-draft) |
+| `GET` | `/api/rfqs/{rfq}/quotations/compare` | `quotation.compare` (neutral; no score/winner) |
+| `GET` | `/api/rfqs/{rfq}/quotations/{quotation}` | `quotation.read` |
+| `GET` | `/api/rfqs/{rfq}/negotiations` | `negotiation.read` |
+| `POST` | `/api/rfqs/{rfq}/items` | `rfq.update` (draft) |
+| `PUT/PATCH` | `/api/rfqs/{rfq}/items/{item}` | `rfq.update` (draft) |
+| `DELETE` | `/api/rfqs/{rfq}/items/{item}` | `rfq.update` (draft) |
 | `GET` | `/api/rfqs/{rfq}/extractions` | `rfq.read` |
 | `POST` | `/api/rfqs/{rfq}/extractions` | `rfq.read` |
 | `POST` | `/api/proposals/{proposal}/approve` | `rfq.approve` |
@@ -182,6 +303,107 @@ All routes below except login require `auth:sanctum`.
 | `GET` | `/api/bank-change-requests/{id}` | `bank.read` |
 | `POST` | `/api/bank-change-requests/{id}/approve` | `bank.approve` |
 | `POST` | `/api/bank-change-requests/{id}/reject` | `bank.approve` |
+| `GET` | `/api/supplier-profiles` | `supplier.profile.read` (buyers: eligible only; filters `q`, `product_category_id`, `brand_id`, `product_q`) |
+| `GET` | `/api/supplier-profile` | `supplier.profile.read` (own) |
+| `POST` | `/api/supplier-profile` | `supplier.profile.create` |
+| `GET` | `/api/supplier-profiles/{id}` | `supplier.profile.read` |
+| `PUT/PATCH` | `/api/supplier-profiles/{id}` | `supplier.profile.update` |
+| `GET` | `/api/supplier/rfqs` | `supplier.rfq.read` (active distributions only) |
+| `GET` | `/api/supplier/rfqs/{rfq}` | `supplier.rfq.read` |
+| `POST` | `/api/supplier/rfq-distributions/{distribution}/quotation` | `quotation.create` |
+| `GET` | `/api/supplier/quotations/{quotation}` | `quotation.read` |
+| `PUT/PATCH` | `/api/supplier/quotations/{quotation}` | `quotation.update` (draft) |
+| `DELETE` | `/api/supplier/quotations/{quotation}` | `quotation.delete` (draft) |
+| `POST` | `/api/supplier/quotations/{quotation}/submit` | `quotation.submit` |
+| `POST` | `/api/supplier/quotations/{quotation}/withdraw` | `quotation.withdraw` |
+| `POST` | `/api/supplier/quotations/{quotation}/items` | `quotation.update` (draft) |
+| `PUT/PATCH` | `/api/supplier/quotations/{quotation}/items/{item}` | `quotation.update` (draft) |
+| `DELETE` | `/api/supplier/quotations/{quotation}/items/{item}` | `quotation.update` (draft) |
+| `POST` | `/api/quotations/{quotation}/negotiation` | `negotiation.create` |
+| `GET` | `/api/negotiations/{negotiation}` | `negotiation.read` |
+| `GET` | `/api/negotiations/{negotiation}/offers` | `negotiation.read` |
+| `POST` | `/api/negotiations/{negotiation}/offers` | `negotiation.offer.create` |
+| `POST` | `/api/negotiations/{negotiation}/offers/{offer}/accept` | `negotiation.offer.accept` |
+| `POST` | `/api/negotiations/{negotiation}/reject` | `negotiation.reject` |
+| `POST` | `/api/negotiations/{negotiation}/withdraw` | `negotiation.withdraw` |
+| `POST` | `/api/negotiations/{negotiation}/purchase-order` | `purchase_order.create` (accepted negotiation only; idempotent) |
+| `GET` | `/api/purchase-orders` | `purchase_order.read` |
+| `GET` | `/api/purchase-orders/{purchaseOrder}` | `purchase_order.read` |
+| `POST` | `/api/purchase-orders/{purchaseOrder}/submit` | `purchase_order.submit` |
+| `POST` | `/api/purchase-orders/{purchaseOrder}/cancel` | `purchase_order.cancel` |
+| `POST` | `/api/purchase-orders/{purchaseOrder}/complete` | `purchase_order.complete` |
+| `GET` | `/api/supplier/negotiations` | `negotiation.read` |
+| `GET` | `/api/supplier/negotiations/{negotiation}` | `negotiation.read` |
+| `GET` | `/api/supplier/negotiations/{negotiation}/offers` | `negotiation.read` |
+| `GET` | `/api/supplier/purchase-orders` | `purchase_order.read` (non-draft) |
+| `GET` | `/api/supplier/purchase-orders/{purchaseOrder}` | `purchase_order.read` |
+| `POST` | `/api/supplier/purchase-orders/{purchaseOrder}/confirm` | `purchase_order.confirm` |
+| `POST` | `/api/supplier/purchase-orders/{purchaseOrder}/reject` | `purchase_order.reject` (requires `reason`) |
+| `POST` | `/api/purchase-orders/{purchaseOrder}/invoice` | `invoice.create` (confirmed PO only; supplier; idempotent) |
+| `GET` | `/api/purchase-orders/{purchaseOrder}/invoice` | `invoice.read` |
+| `GET` | `/api/invoices` | `invoice.read` (buyer company invoices) |
+| `GET` | `/api/invoices/{invoice}` | `invoice.read` |
+| `POST` | `/api/invoices/{invoice}/issue` | `invoice.issue` (draft → issued) |
+| `POST` | `/api/invoices/{invoice}/cancel` | `invoice.cancel` (draft only) |
+| `POST` | `/api/invoices/{invoice}/void` | `invoice.void` (issued only; requires `reason`) |
+| `POST` | `/api/invoices/{invoice}/payment` | `payment.create` (issued invoice only; buyer; amount from invoice) |
+| `GET` | `/api/payments` | `payment.read` (buyer company payments) |
+| `GET` | `/api/payments/{payment}` | `payment.read` |
+| `POST` | `/api/payments/{payment}/mark-paid` | `payment.mark_paid` (pending → paid; supplier/admin) |
+| `POST` | `/api/payments/{payment}/mark-failed` | `payment.mark_failed` |
+| `POST` | `/api/payments/{payment}/cancel` | `payment.cancel` (pending only; buyer/admin) |
+| `POST` | `/api/purchase-orders/{purchaseOrder}/shipment` | `shipment.create` (confirmed PO only; supplier; idempotent) |
+| `GET` | `/api/purchase-orders/{purchaseOrder}/shipment` | `shipment.read` |
+| `GET` | `/api/shipments` | `shipment.read` (buyer company shipments) |
+| `GET` | `/api/shipments/{shipment}` | `shipment.read` |
+| `PATCH` | `/api/shipments/{shipment}` | `shipment.update` (carrier/tracking/method/notes; pending/processing only) |
+| `POST` | `/api/shipments/{shipment}/processing` | `shipment.process` |
+| `POST` | `/api/shipments/{shipment}/ship` | `shipment.ship` |
+| `POST` | `/api/shipments/{shipment}/deliver` | `shipment.deliver` |
+| `POST` | `/api/shipments/{shipment}/cancel` | `shipment.cancel` |
+| `POST` | `/api/shipments/{shipment}/delivery-confirmation` | `delivery_confirmation.create` (delivered only; buyer; idempotent) |
+| `GET` | `/api/shipments/{shipment}/delivery-confirmation` | `delivery_confirmation.read` |
+| `GET` | `/api/delivery-confirmations` | `delivery_confirmation.read` (buyer company) |
+| `GET` | `/api/delivery-confirmations/{deliveryConfirmation}` | `delivery_confirmation.read` |
+| `POST` | `/api/shipments/{shipment}/rma` | `rma.create` (delivered + delivery confirmation; buyer) |
+| `GET` | `/api/rmas` | `rma.read` (buyer company) |
+| `GET` | `/api/rmas/{rma}` | `rma.read` |
+| `POST` | `/api/rmas/{rma}/cancel` | `rma.cancel` (requested only) |
+| `POST` | `/api/rmas/{rma}/return-shipment` | `return_shipment.create` (approved RMA; buyer; idempotent active) |
+| `GET` | `/api/rmas/{rma}/return-shipment` | `return_shipment.read` |
+| `GET` | `/api/return-shipments` | `return_shipment.read` (buyer company) |
+| `GET` | `/api/return-shipments/{returnShipment}` | `return_shipment.read` |
+| `PATCH` | `/api/return-shipments/{returnShipment}` | `return_shipment.update` (pending only) |
+| `POST` | `/api/return-shipments/{returnShipment}/ship` | `return_shipment.ship` |
+| `POST` | `/api/return-shipments/{returnShipment}/deliver` | `return_shipment.deliver` |
+| `POST` | `/api/return-shipments/{returnShipment}/cancel` | `return_shipment.cancel` |
+| `GET` | `/api/supplier/invoices` | `invoice.read` (supplier company invoices) |
+| `GET` | `/api/supplier/invoices/{invoice}` | `invoice.read` |
+| `GET` | `/api/supplier/payments` | `payment.read` (supplier company payments) |
+| `GET` | `/api/supplier/payments/{payment}` | `payment.read` |
+| `GET` | `/api/supplier/shipments` | `shipment.read` (supplier company shipments) |
+| `GET` | `/api/supplier/shipments/{shipment}` | `shipment.read` |
+| `GET` | `/api/supplier/delivery-confirmations` | `delivery_confirmation.read` (supplier company) |
+| `GET` | `/api/supplier/delivery-confirmations/{deliveryConfirmation}` | `delivery_confirmation.read` |
+| `GET` | `/api/supplier/rmas` | `rma.read` (supplier company) |
+| `GET` | `/api/supplier/rmas/{rma}` | `rma.read` |
+| `POST` | `/api/supplier/rmas/{rma}/approve` | `rma.approve` |
+| `POST` | `/api/supplier/rmas/{rma}/reject` | `rma.reject` (requires `rejection_reason`) |
+| `POST` | `/api/supplier/rmas/{rma}/received` | `rma.receive` |
+| `POST` | `/api/supplier/rmas/{rma}/close` | `rma.close` |
+| `GET` | `/api/supplier/return-shipments` | `return_shipment.read` (supplier company) |
+| `GET` | `/api/supplier/return-shipments/{returnShipment}` | `return_shipment.read` |
+| `GET` | `/api/product-categories` | `product.read` |
+| `GET` | `/api/brands` | `product.read` |
+| `POST` | `/api/brands` | `brand.create` |
+| `GET` | `/api/products` | `product.read` (filters: `q`, category, brand, supplier, currency, moq; buyers = published only) |
+| `POST` | `/api/products` | `product.create` (always starts `draft`) |
+| `GET` | `/api/products/{product}` | `product.read` |
+| `PUT/PATCH` | `/api/products/{product}` | `product.update` |
+| `DELETE` | `/api/products/{product}` | `product.delete` |
+| `POST` | `/api/products/{product}/transitions` | lifecycle transition (`product.update` / `product.review`) |
+| `GET/PUT` | `/api/products/{product}/specifications` | `product.read` / `product.update` |
+| `GET/PUT` | `/api/products/{product}/price-tiers` | `product.read` / `product.update` |
 
 ## Testing
 
@@ -189,20 +411,36 @@ All routes below except login require `auth:sanctum`.
 php artisan test
 ```
 
-Latest full run: **90 tests**, **379 assertions**, **0 failures**, **0 errors**, **0 skipped**.
+Latest full run: **227 tests**, **2255 assertions**, **0 failures**, **0 errors**, **0 skipped**.
 
 Coverage includes:
 
 - Authentication and company association
-- RFQ CRUD and tenant isolation
-- AI extraction without official RFQ mutation
-- Proposal approve/reject using stored values
-- Bank change request, approval, history, and isolation
-- Permission denials for approve/read
-- `company_id` / ID spoofing ignored
-- Audit actor, company, before/after for create/approve/reject
+- RFQ / distribution / quotation / negotiation workflows
+- Purchase order creation from accepted negotiation
+- PO lifecycle submit / confirm / reject / cancel / complete
+- PO snapshot integrity vs product mutations
+- PO number uniqueness and idempotent creation
+- Invoice creation from confirmed PO (one invoice per PO)
+- Invoice lifecycle issue / cancel / void
+- Invoice snapshot integrity vs product/PO mutations
+- Invoice number uniqueness and idempotent creation
+- Payment creation from issued invoice (amount from invoice.total)
+- Payment lifecycle mark-paid / mark-failed / cancel
+- Duplicate pending payment prevention (`active_lock`)
+- Shipment creation from confirmed PO (one shipment per PO)
+- Shipment lifecycle processing / ship / deliver / cancel
+- Shipment item and address snapshot integrity
+- Delivery confirmation from delivered shipment (one per shipment)
+- Delivery confirmation immutability and payment/PO independence
+- RMA creation after delivery confirmation; supplier review lifecycle
+- RMA quantity validation and active-RMA uniqueness
+- Return shipment for approved RMA; ship/deliver/cancel lifecycle
+- Return shipment item quantity and ownership validation
+- Cross-company isolation and spoofing defenses
+- AI extraction / proposals / bank change / audit trails
 
-Sprint 5 security tests live in `tests/Feature/Security/`.
+**Not implemented:** payment gateways, refunds, credit notes, invoice/payment mutation from RMA/return shipment, carrier APIs, tracking webhooks, warehouses, inventory, packages, split/partial shipments, disputes, ratings/reviews, escrow, replacement/exchange orders, ZATCA / e-invoicing, VAT/tax calculation engines, B2C checkout.
 
 ## AI / Cursor Usage
 
@@ -229,9 +467,21 @@ Business rules were validated by those tests and by reading the write paths (`Mo
 ## Assumptions
 
 - SQLite is the local and test database.
-- Two roles: `admin` (all permissions, no company) and `company_user` (no approve permissions).
+- Two buyer roles historically: `admin` (all permissions, no company) and `company_user` (no approve permissions). `supplier_user` is the supplier company role.
 - Admin can read/update/approve across companies but cannot create an RFQ (no company context).
 - New RFQs start as `draft`. Status is not an approval state machine.
+- Only **submitted** RFQs can be distributed. Draft / cancelled / closed cannot receive new distributions.
+- Matching requires structured catalog criteria (product and/or category from RFQ items). No artificial supplier ranking.
+- Withdrawn distributions may be redistributed by reactivating the same unique row.
+- Quotations require an active distribution belonging to the authenticated supplier. Submission requires every RFQ item to be quoted. Expired submitted quotes are marked `expired` on read when `valid_until` is past.
+- Negotiations require an active submitted quotation. One open negotiation per quotation. Counter-offers alternate sides. Acceptance does not create a purchase order automatically — buyers create POs explicitly.
+- Purchase orders require an accepted negotiation and snapshotted accepted-offer terms. One PO per negotiation.
+- Invoices require a confirmed purchase order. One invoice per PO. Supplier creates/issues/cancels/voids; buyer reads. Invoice `paid` is set only when a payment is marked paid (not via invoice create payloads). Invoice tax amount is preserved from the PO (no tax engine).
+- Payments require an issued invoice. Buyer creates; amount = invoice.total. One pending payment per invoice. Supplier marks paid/failed; buyer cancels pending. No payment gateway or automatic money movement.
+- Shipments require a confirmed purchase order (independent of payment state). One shipment per PO. Supplier creates/updates/transitions; buyer reads. No carrier integrations or inventory.
+- Delivery confirmations require a delivered shipment. Buyer creates; supplier reads. One confirmation per shipment. Does not complete the PO or change invoice/payment state. No disputes or ratings.
+- RMAs require a delivered shipment with delivery confirmation. Buyer creates/cancels; supplier approves/rejects/receives/closes. One active RMA per shipment. Does not refund, adjust invoices, or modify inventory.
+- Return shipments require an approved RMA. Buyer creates/updates/cancels; supplier ships/delivers. One active return shipment per RMA. Does not auto-change RMA received/closed or financial records.
 - The mock extractor targets text like `Need 25,000 MT ICUMSA 45 Sugar, CIF Jeddah.`
 - Extraction confidence is `0.9`; source is `AI/mock`.
 - Proposals are created per differing field.
