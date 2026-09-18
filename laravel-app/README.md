@@ -443,7 +443,9 @@ All routes below except login require `auth:sanctum`.
 php artisan test
 ```
 
-Latest full run: see Sprint 16 documentation commit for updated counts.
+Latest full run: **244 tests**, **3195 assertions**, **0 failures**, **0 errors**, **0 skipped**.
+
+Sprint 16 focused (`FullB2bLifecycle*` + `FinalB2bSecurity*`): **7 tests**, **390 assertions**, **0 failures**.
 
 Coverage includes:
 
