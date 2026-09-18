@@ -80,6 +80,14 @@ class AuditLog extends Model
 
     public const INVOICE_VOIDED = 'invoice.voided';
 
+    public const PAYMENT_CREATED = 'payment.created';
+
+    public const PAYMENT_MARKED_PAID = 'payment.marked_paid';
+
+    public const PAYMENT_MARKED_FAILED = 'payment.marked_failed';
+
+    public const PAYMENT_CANCELLED = 'payment.cancelled';
+
     public const RFQ_APPROVED = 'rfq.approved';
 
     public const PROPOSAL_CREATED = 'proposal.created';

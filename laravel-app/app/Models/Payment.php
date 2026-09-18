@@ -6,19 +6,16 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use InvalidArgumentException;
 
 #[Fillable([])]
-class Invoice extends Model
+class Payment extends Model
 {
-    public const STATUS_DRAFT = 'draft';
-
-    public const STATUS_ISSUED = 'issued';
-
-    public const STATUS_VOIDED = 'voided';
+    public const STATUS_PENDING = 'pending';
 
     public const STATUS_PAID = 'paid';
+
+    public const STATUS_FAILED = 'failed';
 
     public const STATUS_CANCELLED = 'cancelled';
 
@@ -26,33 +23,43 @@ class Invoice extends Model
      * @var list<string>
      */
     public const STATUSES = [
-        self::STATUS_DRAFT,
-        self::STATUS_ISSUED,
-        self::STATUS_VOIDED,
+        self::STATUS_PENDING,
         self::STATUS_PAID,
+        self::STATUS_FAILED,
         self::STATUS_CANCELLED,
+    ];
+
+    public const METHOD_BANK_TRANSFER = 'bank_transfer';
+
+    public const METHOD_CASH = 'cash';
+
+    public const METHOD_MANUAL = 'manual';
+
+    /**
+     * @var list<string>
+     */
+    public const METHODS = [
+        self::METHOD_BANK_TRANSFER,
+        self::METHOD_CASH,
+        self::METHOD_MANUAL,
     ];
 
     /**
      * Transition matrix.
      *
-     * draft → issued | cancelled
-     * issued → voided | paid (paid only via PaymentService::markPaid)
-     * voided / cancelled / paid → terminal
+     * pending → paid | failed | cancelled
+     * paid / failed / cancelled → terminal
      *
      * @var array<string, list<string>>
      */
     public const TRANSITIONS = [
-        self::STATUS_DRAFT => [
-            self::STATUS_ISSUED,
+        self::STATUS_PENDING => [
+            self::STATUS_PAID,
+            self::STATUS_FAILED,
             self::STATUS_CANCELLED,
         ],
-        self::STATUS_ISSUED => [
-            self::STATUS_VOIDED,
-            self::STATUS_PAID,
-        ],
-        self::STATUS_VOIDED => [],
         self::STATUS_PAID => [],
+        self::STATUS_FAILED => [],
         self::STATUS_CANCELLED => [],
     ];
 
@@ -62,25 +69,19 @@ class Invoice extends Model
     protected function casts(): array
     {
         return [
-            'shipping_amount' => 'decimal:2',
-            'tax_amount' => 'decimal:2',
-            'subtotal' => 'decimal:2',
-            'total' => 'decimal:2',
-            'buyer_snapshot' => 'array',
-            'supplier_snapshot' => 'array',
-            'issued_at' => 'datetime',
-            'cancelled_at' => 'datetime',
-            'voided_at' => 'datetime',
+            'amount' => 'decimal:2',
             'paid_at' => 'datetime',
+            'failed_at' => 'datetime',
+            'cancelled_at' => 'datetime',
         ];
     }
 
     /**
-     * @return BelongsTo<PurchaseOrder, $this>
+     * @return BelongsTo<Invoice, $this>
      */
-    public function purchaseOrder(): BelongsTo
+    public function invoice(): BelongsTo
     {
-        return $this->belongsTo(PurchaseOrder::class);
+        return $this->belongsTo(Invoice::class);
     }
 
     /**
@@ -99,33 +100,17 @@ class Invoice extends Model
         return $this->belongsTo(Company::class, 'supplier_company_id');
     }
 
-    /**
-     * @return HasMany<InvoiceItem, $this>
-     */
-    public function items(): HasMany
+    public function isPending(): bool
     {
-        return $this->hasMany(InvoiceItem::class)->orderBy('sort_order')->orderBy('id');
+        return $this->status === self::STATUS_PENDING;
     }
 
-    /**
-     * @return HasMany<Payment, $this>
-     */
-    public function payments(): HasMany
-    {
-        return $this->hasMany(Payment::class)->orderByDesc('id');
-    }
-
-    public function isDraft(): bool
-    {
-        return $this->status === self::STATUS_DRAFT;
-    }
-
-    public function isCommerciallyImmutable(): bool
+    public function isTerminal(): bool
     {
         return in_array($this->status, [
-            self::STATUS_ISSUED,
-            self::STATUS_VOIDED,
             self::STATUS_PAID,
+            self::STATUS_FAILED,
+            self::STATUS_CANCELLED,
         ], true);
     }
 
@@ -140,20 +125,21 @@ class Invoice extends Model
     public function transitionTo(string $to): void
     {
         if (! in_array($to, $this->allowedTransitions(), true)) {
-            throw new InvalidArgumentException("Invalid invoice lifecycle transition from {$this->status} to {$to}.");
+            throw new InvalidArgumentException("Invalid payment lifecycle transition from {$this->status} to {$to}.");
         }
 
-        if ($to === self::STATUS_ISSUED) {
-            $this->issued_at = now();
+        if ($to === self::STATUS_PAID) {
+            $this->paid_at = now();
+        }
+        if ($to === self::STATUS_FAILED) {
+            $this->failed_at = now();
         }
         if ($to === self::STATUS_CANCELLED) {
             $this->cancelled_at = now();
         }
-        if ($to === self::STATUS_VOIDED) {
-            $this->voided_at = now();
-        }
-        if ($to === self::STATUS_PAID) {
-            $this->paid_at = now();
+
+        if (in_array($to, [self::STATUS_PAID, self::STATUS_FAILED, self::STATUS_CANCELLED], true)) {
+            $this->active_lock = null;
         }
 
         $this->status = $to;
@@ -161,8 +147,8 @@ class Invoice extends Model
     }
 
     /**
-     * @param  Builder<Invoice>  $query
-     * @return Builder<Invoice>
+     * @param  Builder<Payment>  $query
+     * @return Builder<Payment>
      */
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
@@ -182,7 +168,7 @@ class Invoice extends Model
     public function toApiArray(): array
     {
         $this->loadMissing([
-            'items',
+            'invoice',
             'buyerCompany',
             'supplierCompany.supplierProfile',
         ]);
@@ -190,17 +176,13 @@ class Invoice extends Model
         return [
             'id' => $this->id,
             'number' => $this->number,
-            'purchase_order_id' => $this->purchase_order_id,
-            'purchase_order_number' => $this->purchase_order_number,
+            'invoice_id' => $this->invoice_id,
+            'invoice_number' => $this->invoice?->number,
             'status' => $this->status,
+            'method' => $this->method,
             'currency' => $this->currency,
-            'shipping_amount' => (string) $this->shipping_amount,
-            'tax_amount' => (string) $this->tax_amount,
-            'subtotal' => (string) $this->subtotal,
-            'total' => (string) $this->total,
+            'amount' => (string) $this->amount,
             'notes' => $this->notes,
-            'cancellation_reason' => $this->cancellation_reason,
-            'void_reason' => $this->void_reason,
             'buyer_company' => [
                 'id' => $this->buyer_company_id,
                 'name' => $this->buyerCompany?->name,
@@ -210,13 +192,9 @@ class Invoice extends Model
                 'name' => $this->supplierCompany?->name,
                 'display_name' => $this->supplierCompany?->supplierProfile?->display_name,
             ],
-            'buyer_snapshot' => $this->buyer_snapshot,
-            'supplier_snapshot' => $this->supplier_snapshot,
-            'items' => $this->items->map(fn (InvoiceItem $item) => $item->toApiArray())->values()->all(),
-            'issued_at' => $this->issued_at?->toISOString(),
-            'cancelled_at' => $this->cancelled_at?->toISOString(),
-            'voided_at' => $this->voided_at?->toISOString(),
             'paid_at' => $this->paid_at?->toISOString(),
+            'failed_at' => $this->failed_at?->toISOString(),
+            'cancelled_at' => $this->cancelled_at?->toISOString(),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];

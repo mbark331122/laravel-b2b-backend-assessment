@@ -83,6 +83,16 @@ class Permission extends Model
 
     public const INVOICE_VOID = 'invoice.void';
 
+    public const PAYMENT_READ = 'payment.read';
+
+    public const PAYMENT_CREATE = 'payment.create';
+
+    public const PAYMENT_MARK_PAID = 'payment.mark_paid';
+
+    public const PAYMENT_MARK_FAILED = 'payment.mark_failed';
+
+    public const PAYMENT_CANCEL = 'payment.cancel';
+
     public const BANK_READ = 'bank.read';
 
     public const BANK_CHANGE_REQUEST = 'bank.change_request';
@@ -155,6 +165,11 @@ class Permission extends Model
             self::INVOICE_ISSUE,
             self::INVOICE_CANCEL,
             self::INVOICE_VOID,
+            self::PAYMENT_READ,
+            self::PAYMENT_CREATE,
+            self::PAYMENT_MARK_PAID,
+            self::PAYMENT_MARK_FAILED,
+            self::PAYMENT_CANCEL,
             self::BANK_READ,
             self::BANK_CHANGE_REQUEST,
             self::BANK_APPROVE,
@@ -202,6 +217,9 @@ class Permission extends Model
             self::PURCHASE_ORDER_CANCEL,
             self::PURCHASE_ORDER_COMPLETE,
             self::INVOICE_READ,
+            self::PAYMENT_READ,
+            self::PAYMENT_CREATE,
+            self::PAYMENT_CANCEL,
             self::BANK_READ,
             self::BANK_CHANGE_REQUEST,
             self::PRODUCT_READ,
@@ -247,6 +265,9 @@ class Permission extends Model
             self::INVOICE_ISSUE,
             self::INVOICE_CANCEL,
             self::INVOICE_VOID,
+            self::PAYMENT_READ,
+            self::PAYMENT_MARK_PAID,
+            self::PAYMENT_MARK_FAILED,
         ];
     }
 

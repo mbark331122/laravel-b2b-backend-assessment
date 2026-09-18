@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\BuyerQuotationController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\NegotiationController;
+use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProductPriceTierController;
@@ -98,6 +99,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/invoices/{invoice}/issue', [InvoiceController::class, 'issue']);
     Route::post('/invoices/{invoice}/cancel', [InvoiceController::class, 'cancel']);
     Route::post('/invoices/{invoice}/void', [InvoiceController::class, 'void']);
+    Route::post('/invoices/{invoice}/payment', [PaymentController::class, 'store']);
+
+    Route::get('/payments', [PaymentController::class, 'index']);
+    Route::get('/payments/{payment}', [PaymentController::class, 'show']);
+    Route::post('/payments/{payment}/mark-paid', [PaymentController::class, 'markPaid']);
+    Route::post('/payments/{payment}/mark-failed', [PaymentController::class, 'markFailed']);
+    Route::post('/payments/{payment}/cancel', [PaymentController::class, 'cancel']);
 
     Route::get('/supplier/negotiations', [NegotiationController::class, 'indexForSupplier']);
     Route::get('/supplier/negotiations/{negotiation}', [NegotiationController::class, 'show']);
@@ -110,6 +118,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/supplier/invoices', [InvoiceController::class, 'indexForSupplier']);
     Route::get('/supplier/invoices/{invoice}', [InvoiceController::class, 'show']);
+
+    Route::get('/supplier/payments', [PaymentController::class, 'indexForSupplier']);
+    Route::get('/supplier/payments/{payment}', [PaymentController::class, 'show']);
 
     Route::get('/product-categories', [ProductCategoryController::class, 'index']);
     Route::get('/brands', [BrandController::class, 'index']);
