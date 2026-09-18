@@ -1,5 +1,6 @@
 # Laravel Mini B2B Backend
 
-The assessment backend lives in [`laravel-app/`](laravel-app/).
+The backend lives in [`laravel-app/`](laravel-app/).
 
-See [`laravel-app/README.md`](laravel-app/README.md) for architecture, setup, security, and testing.
+- Sprint 0 architecture (current foundation): [`laravel-app/docs/sprint-0/`](laravel-app/docs/sprint-0/)
+- Application setup, API, and testing: [`laravel-app/README.md`](laravel-app/README.md)
