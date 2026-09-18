@@ -122,6 +122,14 @@ class Rfq extends Model
         return $this->hasMany(Quotation::class)->orderBy('id');
     }
 
+    /**
+     * @return HasMany<Negotiation, $this>
+     */
+    public function negotiations(): HasMany
+    {
+        return $this->hasMany(Negotiation::class)->orderBy('id');
+    }
+
     public function isEditable(): bool
     {
         return $this->status === self::STATUS_DRAFT;

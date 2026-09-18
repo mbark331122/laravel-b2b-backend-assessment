@@ -1,6 +1,6 @@
 # Laravel Mini B2B Backend
 
-B2B procurement and supplier commerce API (multi-tenant). Current codebase includes identity/tenancy, supplier profiles, wholesale product catalog, RFQs, supplier matching & RFQ distribution, supplier quotations with buyer quote comparison, mocked AI extraction with human approval, supplier bank-change approval, and auditability — with a fixed sprint roadmap for the full commercial lifecycle.
+B2B procurement and supplier commerce API (multi-tenant). Current codebase includes identity/tenancy, supplier profiles, wholesale product catalog, RFQs, supplier matching & distribution, quotations, quotation negotiation with immutable counter-offer history, mocked AI extraction with human approval, supplier bank-change approval, and auditability — with a fixed sprint roadmap for the full commercial lifecycle.
 
 There is no frontend. The API is the product.
 
@@ -22,7 +22,9 @@ This is a single Laravel 13 API application.
 
 **Supplier matching & distribution.** Buyers discover eligible suppliers (`GET /api/supplier-profiles`) and preview deterministic matches for a submitted RFQ (`GET /api/rfqs/{rfq}/suppliers`). Matching uses structured catalog data only (published products overlapping RFQ product IDs and/or categories) — no AI, scores, or reputation ranking. Results are ordered by `display_name`, then `id`. Buyers distribute to selected eligible suppliers (`POST /api/rfqs/{rfq}/distributions`). Distribution lifecycle: `pending` / `sent` / `withdrawn` (server-controlled). Deduplication: unique `(rfq_id, supplier_company_id)`; withdrawing then redistributing reactivates the same row. Suppliers may **read** only RFQs explicitly distributed to their company (`GET /api/supplier/rfqs`).
 
-**Quotations.** Suppliers create draft quotations against an **active** distribution for their own company (`POST /api/supplier/rfq-distributions/{distribution}/quotation`). Lifecycle: `draft` → `submitted` → `withdrawn` | `expired`. Totals are server-calculated (`line_total = qty × unit_price`, `subtotal = Σ line_total`, `total = subtotal + shipping + tax`). Client-provided totals are ignored. At most one active (`draft`/`submitted`) quotation per distribution via `active_lock`; withdrawn/expired rows are not reused — a new draft may be created. Submitted quotes become immutable; expiration is evaluated on read when `valid_until` is past (no scheduler required). Buyers list/compare non-draft quotations on their own RFQs. Comparison is neutral (no score, rank, or winner). Negotiation / PO / payment are not implemented.
+**Quotations.** Suppliers create draft quotations against an **active** distribution for their own company (`POST /api/supplier/rfq-distributions/{distribution}/quotation`). Lifecycle: `draft` → `submitted` → `withdrawn` | `expired`. Totals are server-calculated (`line_total = qty × unit_price`, `subtotal = Σ line_total`, `total = subtotal + shipping + tax`). Client-provided totals are ignored. At most one active (`draft`/`submitted`) quotation per distribution via `active_lock`; withdrawn/expired rows are not reused — a new draft may be created. Submitted quotes become immutable; expiration is evaluated on read when `valid_until` is past (no scheduler required). Buyers list/compare non-draft quotations on their own RFQs. Comparison is neutral (no score, rank, or winner).
+
+**Negotiation.** Participants open a negotiation against an active submitted quotation (`POST /api/quotations/{quotation}/negotiation`). An immutable initial offer (sequence 1, supplier side) is snapshotted from the quotation. Counter-offers are append-only (`POST /api/negotiations/{negotiation}/offers`) with server-enforced alternating turns. Offers cannot be edited or deleted. Lifecycle: `open` → `accepted` | `rejected` | `withdrawn` | `expired`. Acceptance is by the opposite party on the latest proposed unexpired offer (transaction + row locks). Original quotation is never mutated. Acceptance does **not** create a PO/order/payment. No ranking or automatic winner selection.
 
 **AI.** `MockAiExtractor` parses text only. It never receives or writes an RFQ. `AiExtractionService` stores an extraction and, when a field differs, a pending `RfqProposal`. Official RFQ fields change only in `RfqProposal::approve()`, using the stored proposed value.
 
@@ -98,6 +100,9 @@ RfqDistribution → supplier Company + SupplierProfile
 Rfq 1──* Quotation
 RfqDistribution 1──* Quotation
 Quotation 1──* QuotationItem → RfqItem
+Quotation 1──* Negotiation
+Negotiation 1──* NegotiationOffer (append-only)
+NegotiationOffer 1──* NegotiationOfferItem → RfqItem
 AiExtraction 1──* RfqProposal
 
 Supplier 1──1 SupplierBankAccount
@@ -109,7 +114,7 @@ AuditLog → actor (User), company (Company), auditable (morph)
 
 - **Companies** — tenants with buyer/supplier classification (`is_buyer`, `is_supplier`). Seeded: Company A/B (buyer), Supplier Company / Supplier Company B (supplier).
 - **Users** — `company_id` nullable (admin is null). `role_id` required. `company_id` / `role_id` are not fillable. Classification is read from the user's company.
-- **Roles / Permissions** — `admin` has all permissions. `company_user` has buyer RFQ/bank/catalog-read permissions including `rfq.submit` / `rfq.cancel` / `rfq.close` / `rfq.delete` / `rfq.distribution.*` / `quotation.read` / `quotation.compare` (not `rfq.approve` or bank approve). `supplier_user` has catalog mutate permissions plus `supplier.rfq.read` and supplier `quotation.*` (create/update/delete/submit/withdraw/read). Platform-only: `brand.create`, `product.review`.
+- **Roles / Permissions** — `admin` has all permissions. `company_user` has buyer RFQ/bank/catalog-read permissions including `rfq.*` lifecycle/distribution, `quotation.read` / `quotation.compare`, and `negotiation.*` (read/create/offer/accept/reject/withdraw). `supplier_user` has catalog mutate permissions plus `supplier.rfq.read`, supplier `quotation.*`, and `negotiation.*`. Platform-only: `brand.create`, `product.review`.
 - **Supplier Profiles** — one profile per supplier company (`display_name`, description, contact, status). Buyer discovery via `GET /api/supplier-profiles` returns only eligible suppliers (`status=active` + `company.is_supplier=true`), filterable by `q`, `product_category_id`, `brand_id`, `product_q`.
 - **Brands** — platform-level (`name`, `slug`, status). Readable with `product.read`; create requires `brand.create`.
 - **Product Categories** — platform-level categories (`name`, status).
@@ -119,6 +124,9 @@ AuditLog → actor (User), company (Company), auditable (morph)
 - **RFQ Distributions** — buyer→supplier distribution rows: `rfq_id`, `supplier_company_id`, `supplier_profile_id`, status (`pending` / `sent` / `withdrawn`), `distributed_at` / `withdrawn_at`. Unique per `(rfq_id, supplier_company_id)`. Reactivate-on-withdraw (no duplicate active rows).
 - **Quotations** — supplier offers on a distribution: currency, `valid_until`, notes, shipping/tax, server totals, lifecycle (`draft` / `submitted` / `withdrawn` / `expired`). Ownership = authenticated supplier company. `active_lock` enforces one active quotation per distribution.
 - **Quotation Items** — map 1:1 to RFQ items with quantity, unit price, server `line_total`, snapshot JSON captured at create time.
+- **Negotiations** — one open negotiation per quotation (`active_lock`); participants = RFQ buyer company + quotation supplier company; lifecycle `open` / `accepted` / `rejected` / `withdrawn` / `expired`.
+- **Negotiation Offers** — append-only sequenced offers (`buyer`/`supplier` side); statuses `proposed` / `superseded` / `accepted`; immutable after create.
+- **Negotiation Offer Items** — historical commercial lines with snapshots; server-calculated totals.
 - **AI Extractions** — proposed fields, confidence, source (`AI/mock`), status. Belongs to an RFQ. Does not replace the official RFQ.
 - **RFQ Proposals** — field-level conflict: current value, proposed value, source, confidence, status (`pending` / `approved` / `rejected`).
 - **Suppliers** — minimal tenant-owned record for bank data (not the catalog profile).
@@ -139,6 +147,7 @@ Tenant context is never taken from a client `company_id`.
 - Supplier RFQ visibility requires an **active** distribution to the authenticated supplier company. Suppliers cannot browse buyer RFQ lists (`GET /api/rfqs` remains buyer permission `rfq.read`).
 - Eligible suppliers for discovery/distribution are resolved server-side (`is_supplier`, active profile, published catalog match). Client-supplied supplier classification is never trusted.
 - Quotation ownership is the authenticated supplier company. Buyers only see non-draft quotations on RFQs they own. Spoofed `supplier_id` / `company_id` / `tenant_id` / `rfq_distribution_id` are ignored.
+- Negotiation participants and turn side are resolved server-side from RFQ/quotation ownership. Client `side` / `party` / company IDs are ignored. Historical offers have no update/delete routes.
 
 ## AI Safety
 
@@ -186,6 +195,10 @@ Important mutations are logged. Reads are not.
 | `quotation.created` / `updated` / `deleted` | Supplier draft quotation mutations |
 | `quotation.submitted` / `withdrawn` | Quotation lifecycle |
 | `quotation.item.created` / `updated` / `deleted` | Quotation line item mutations |
+| `negotiation.created` | Negotiation opened |
+| `negotiation.offer.created` | Offer / counter-offer appended |
+| `negotiation.offer.accepted` | Offer accepted; negotiation closed |
+| `negotiation.rejected` / `withdrawn` | Negotiation terminated |
 | `rfq.approved` | Official RFQ changed by proposal approval |
 | `proposal.created` | A conflicting proposal is stored |
 | `proposal.approved` / `proposal.rejected` | Proposal resolved |
@@ -225,6 +238,7 @@ All routes below except login require `auth:sanctum`.
 | `GET` | `/api/rfqs/{rfq}/quotations` | `quotation.read` (non-draft) |
 | `GET` | `/api/rfqs/{rfq}/quotations/compare` | `quotation.compare` (neutral; no score/winner) |
 | `GET` | `/api/rfqs/{rfq}/quotations/{quotation}` | `quotation.read` |
+| `GET` | `/api/rfqs/{rfq}/negotiations` | `negotiation.read` |
 | `POST` | `/api/rfqs/{rfq}/items` | `rfq.update` (draft) |
 | `PUT/PATCH` | `/api/rfqs/{rfq}/items/{item}` | `rfq.update` (draft) |
 | `DELETE` | `/api/rfqs/{rfq}/items/{item}` | `rfq.update` (draft) |
@@ -253,6 +267,16 @@ All routes below except login require `auth:sanctum`.
 | `POST` | `/api/supplier/quotations/{quotation}/items` | `quotation.update` (draft) |
 | `PUT/PATCH` | `/api/supplier/quotations/{quotation}/items/{item}` | `quotation.update` (draft) |
 | `DELETE` | `/api/supplier/quotations/{quotation}/items/{item}` | `quotation.update` (draft) |
+| `POST` | `/api/quotations/{quotation}/negotiation` | `negotiation.create` |
+| `GET` | `/api/negotiations/{negotiation}` | `negotiation.read` |
+| `GET` | `/api/negotiations/{negotiation}/offers` | `negotiation.read` |
+| `POST` | `/api/negotiations/{negotiation}/offers` | `negotiation.offer.create` |
+| `POST` | `/api/negotiations/{negotiation}/offers/{offer}/accept` | `negotiation.offer.accept` |
+| `POST` | `/api/negotiations/{negotiation}/reject` | `negotiation.reject` |
+| `POST` | `/api/negotiations/{negotiation}/withdraw` | `negotiation.withdraw` |
+| `GET` | `/api/supplier/negotiations` | `negotiation.read` |
+| `GET` | `/api/supplier/negotiations/{negotiation}` | `negotiation.read` |
+| `GET` | `/api/supplier/negotiations/{negotiation}/offers` | `negotiation.read` |
 | `GET` | `/api/product-categories` | `product.read` |
 | `GET` | `/api/brands` | `product.read` |
 | `POST` | `/api/brands` | `brand.create` |
@@ -271,29 +295,25 @@ All routes below except login require `auth:sanctum`.
 php artisan test
 ```
 
-Latest full run: **173 tests**, **950 assertions**, **0 failures**, **0 errors**, **0 skipped**.
+Latest full run: **184 tests**, **1093 assertions**, **0 failures**, **0 errors**, **0 skipped**.
 
 Coverage includes:
 
 - Authentication and company association
 - RFQ CRUD and tenant isolation
-- Supplier discovery eligibility / filters / deterministic ordering
-- Deterministic RFQ supplier matching (no scores)
-- RFQ distribution lifecycle (sent / withdraw / reactivate)
-- Supplier read-only distributed RFQ inbox isolation
+- Supplier discovery / matching / distribution
 - Supplier quotation draft/submit/withdraw + server pricing
 - Buyer quotation access and neutral comparison
-- Quotation expiration without a scheduler
+- Negotiation open / counter-offers / turn enforcement
+- Offer immutability and acceptance/reject/withdraw
+- Negotiation expiration without a scheduler
 - AI extraction without official RFQ mutation
 - Proposal approve/reject using stored values
 - Bank change request, approval, history, and isolation
-- Permission denials for approve/read/distribution/quotation
-- `company_id` / `supplier_id` / `tenant_id` spoofing ignored
-- Audit actor, company, before/after for create/approve/reject/distribute/quote
+- Permission denials and ownership spoofing ignored
+- Audit actor, company, before/after for key mutations
 
-Sprint 5–6 security tests live in `tests/Feature/Security/`.
-
-**Not implemented yet:** negotiation, counter-offers, purchase orders, payments, shipments, messaging, ratings/scoring, AI matching, winner selection.
+**Not implemented yet:** purchase orders, payments, shipments, messaging, ratings/scoring, AI matching, automatic order creation on acceptance.
 
 ## AI / Cursor Usage
 
@@ -327,6 +347,7 @@ Business rules were validated by those tests and by reading the write paths (`Mo
 - Matching requires structured catalog criteria (product and/or category from RFQ items). No artificial supplier ranking.
 - Withdrawn distributions may be redistributed by reactivating the same unique row.
 - Quotations require an active distribution belonging to the authenticated supplier. Submission requires every RFQ item to be quoted. Expired submitted quotes are marked `expired` on read when `valid_until` is past.
+- Negotiations require an active submitted quotation. One open negotiation per quotation. Counter-offers alternate sides. Acceptance does not create a purchase order.
 - The mock extractor targets text like `Need 25,000 MT ICUMSA 45 Sugar, CIF Jeddah.`
 - Extraction confidence is `0.9`; source is `AI/mock`.
 - Proposals are created per differing field.

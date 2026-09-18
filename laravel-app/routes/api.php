@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BankChangeRequestController;
 use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\BuyerQuotationController;
+use App\Http\Controllers\Api\NegotiationController;
 use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProductPriceTierController;
@@ -36,6 +37,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/rfqs/{rfq}/quotations/compare', [BuyerQuotationController::class, 'compare']);
     Route::get('/rfqs/{rfq}/quotations', [BuyerQuotationController::class, 'index']);
     Route::get('/rfqs/{rfq}/quotations/{quotation}', [BuyerQuotationController::class, 'show']);
+    Route::get('/rfqs/{rfq}/negotiations', [NegotiationController::class, 'indexForRfq']);
     Route::post('/rfqs/{rfq}/items', [RfqItemController::class, 'store']);
     Route::put('/rfqs/{rfq}/items/{item}', [RfqItemController::class, 'update']);
     Route::patch('/rfqs/{rfq}/items/{item}', [RfqItemController::class, 'update']);
@@ -71,6 +73,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/supplier/quotations/{quotation}/items/{item}', [SupplierQuotationController::class, 'updateItem']);
     Route::patch('/supplier/quotations/{quotation}/items/{item}', [SupplierQuotationController::class, 'updateItem']);
     Route::delete('/supplier/quotations/{quotation}/items/{item}', [SupplierQuotationController::class, 'destroyItem']);
+
+    Route::post('/quotations/{quotation}/negotiation', [NegotiationController::class, 'storeForQuotation']);
+    Route::get('/negotiations/{negotiation}', [NegotiationController::class, 'show']);
+    Route::get('/negotiations/{negotiation}/offers', [NegotiationController::class, 'offers']);
+    Route::post('/negotiations/{negotiation}/offers', [NegotiationController::class, 'storeOffer']);
+    Route::post('/negotiations/{negotiation}/offers/{offer}/accept', [NegotiationController::class, 'acceptOffer']);
+    Route::post('/negotiations/{negotiation}/reject', [NegotiationController::class, 'reject']);
+    Route::post('/negotiations/{negotiation}/withdraw', [NegotiationController::class, 'withdraw']);
+
+    Route::get('/supplier/negotiations', [NegotiationController::class, 'indexForSupplier']);
+    Route::get('/supplier/negotiations/{negotiation}', [NegotiationController::class, 'show']);
+    Route::get('/supplier/negotiations/{negotiation}/offers', [NegotiationController::class, 'offers']);
 
     Route::get('/product-categories', [ProductCategoryController::class, 'index']);
     Route::get('/brands', [BrandController::class, 'index']);

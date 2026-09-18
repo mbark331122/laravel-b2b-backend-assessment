@@ -48,6 +48,18 @@ class AuditLog extends Model
 
     public const QUOTATION_ITEM_DELETED = 'quotation.item.deleted';
 
+    public const NEGOTIATION_CREATED = 'negotiation.created';
+
+    public const NEGOTIATION_OFFER_CREATED = 'negotiation.offer.created';
+
+    public const NEGOTIATION_OFFER_ACCEPTED = 'negotiation.offer.accepted';
+
+    public const NEGOTIATION_REJECTED = 'negotiation.rejected';
+
+    public const NEGOTIATION_WITHDRAWN = 'negotiation.withdrawn';
+
+    public const NEGOTIATION_EXPIRED = 'negotiation.expired';
+
     public const RFQ_APPROVED = 'rfq.approved';
 
     public const PROPOSAL_CREATED = 'proposal.created';

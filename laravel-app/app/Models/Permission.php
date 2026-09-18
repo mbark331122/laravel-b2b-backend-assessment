@@ -47,6 +47,18 @@ class Permission extends Model
 
     public const QUOTATION_COMPARE = 'quotation.compare';
 
+    public const NEGOTIATION_READ = 'negotiation.read';
+
+    public const NEGOTIATION_CREATE = 'negotiation.create';
+
+    public const NEGOTIATION_OFFER_CREATE = 'negotiation.offer.create';
+
+    public const NEGOTIATION_OFFER_ACCEPT = 'negotiation.offer.accept';
+
+    public const NEGOTIATION_REJECT = 'negotiation.reject';
+
+    public const NEGOTIATION_WITHDRAW = 'negotiation.withdraw';
+
     public const BANK_READ = 'bank.read';
 
     public const BANK_CHANGE_REQUEST = 'bank.change_request';
@@ -101,6 +113,12 @@ class Permission extends Model
             self::QUOTATION_SUBMIT,
             self::QUOTATION_WITHDRAW,
             self::QUOTATION_COMPARE,
+            self::NEGOTIATION_READ,
+            self::NEGOTIATION_CREATE,
+            self::NEGOTIATION_OFFER_CREATE,
+            self::NEGOTIATION_OFFER_ACCEPT,
+            self::NEGOTIATION_REJECT,
+            self::NEGOTIATION_WITHDRAW,
             self::BANK_READ,
             self::BANK_CHANGE_REQUEST,
             self::BANK_APPROVE,
@@ -136,6 +154,12 @@ class Permission extends Model
             self::RFQ_DISTRIBUTION_WITHDRAW,
             self::QUOTATION_READ,
             self::QUOTATION_COMPARE,
+            self::NEGOTIATION_READ,
+            self::NEGOTIATION_CREATE,
+            self::NEGOTIATION_OFFER_CREATE,
+            self::NEGOTIATION_OFFER_ACCEPT,
+            self::NEGOTIATION_REJECT,
+            self::NEGOTIATION_WITHDRAW,
             self::BANK_READ,
             self::BANK_CHANGE_REQUEST,
             self::PRODUCT_READ,
@@ -167,6 +191,12 @@ class Permission extends Model
             self::QUOTATION_DELETE,
             self::QUOTATION_SUBMIT,
             self::QUOTATION_WITHDRAW,
+            self::NEGOTIATION_READ,
+            self::NEGOTIATION_CREATE,
+            self::NEGOTIATION_OFFER_CREATE,
+            self::NEGOTIATION_OFFER_ACCEPT,
+            self::NEGOTIATION_REJECT,
+            self::NEGOTIATION_WITHDRAW,
         ];
     }
 
