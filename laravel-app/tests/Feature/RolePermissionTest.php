@@ -33,6 +33,7 @@ class RolePermissionTest extends TestCase
     {
         $this->assertTrue(Role::query()->where('name', Role::ADMIN)->exists());
         $this->assertTrue(Role::query()->where('name', Role::COMPANY_USER)->exists());
+        $this->assertTrue(Role::query()->where('name', Role::SUPPLIER_USER)->exists());
     }
 
     public function test_admin_role_has_all_permissions(): void
@@ -56,19 +57,44 @@ class RolePermissionTest extends TestCase
 
         $this->assertFalse($role->permissions->contains('name', Permission::RFQ_APPROVE));
         $this->assertFalse($role->permissions->contains('name', Permission::BANK_APPROVE));
+        $this->assertFalse($role->permissions->contains('name', Permission::PRODUCT_CREATE));
+        $this->assertTrue($role->permissions->contains('name', Permission::PRODUCT_READ));
+    }
+
+    public function test_supplier_user_role_has_catalog_permissions(): void
+    {
+        $role = Role::query()->where('name', Role::SUPPLIER_USER)->firstOrFail();
+
+        $this->assertEqualsCanonicalizing(
+            Permission::supplierUserNames(),
+            $role->permissions->pluck('name')->all()
+        );
+
+        $this->assertTrue($role->permissions->contains('name', Permission::PRODUCT_CREATE));
+        $this->assertFalse($role->permissions->contains('name', Permission::RFQ_READ));
+        $this->assertFalse($role->permissions->contains('name', Permission::RFQ_CREATE));
     }
 
     public function test_seeded_users_receive_permissions_through_their_role(): void
     {
         $userA = User::query()->where('email', UserSeeder::USER_A_EMAIL)->firstOrFail();
+        $supplier = User::query()->where('email', UserSeeder::SUPPLIER_USER_EMAIL)->firstOrFail();
         $admin = User::query()->where('email', UserSeeder::ADMIN_EMAIL)->firstOrFail();
 
         $this->assertTrue($userA->hasPermission(Permission::RFQ_READ));
         $this->assertTrue($userA->hasPermission(Permission::BANK_CHANGE_REQUEST));
+        $this->assertTrue($userA->hasPermission(Permission::PRODUCT_READ));
         $this->assertFalse($userA->hasPermission(Permission::RFQ_APPROVE));
         $this->assertFalse($userA->hasPermission(Permission::BANK_APPROVE));
+        $this->assertFalse($userA->hasPermission(Permission::PRODUCT_CREATE));
+
+        $this->assertTrue($supplier->hasPermission(Permission::PRODUCT_CREATE));
+        $this->assertTrue($supplier->hasPermission(Permission::PRODUCT_UPDATE));
+        $this->assertTrue($supplier->hasPermission(Permission::PRODUCT_DELETE));
+        $this->assertFalse($supplier->hasPermission(Permission::RFQ_CREATE));
 
         $this->assertTrue($admin->hasPermission(Permission::RFQ_APPROVE));
         $this->assertTrue($admin->hasPermission(Permission::BANK_APPROVE));
+        $this->assertTrue($admin->hasPermission(Permission::PRODUCT_DELETE));
     }
 }
