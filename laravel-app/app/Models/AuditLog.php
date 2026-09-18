@@ -30,6 +30,24 @@ class AuditLog extends Model
 
     public const RFQ_DISTRIBUTION_WITHDRAWN = 'rfq.distribution.withdrawn';
 
+    public const QUOTATION_CREATED = 'quotation.created';
+
+    public const QUOTATION_UPDATED = 'quotation.updated';
+
+    public const QUOTATION_DELETED = 'quotation.deleted';
+
+    public const QUOTATION_SUBMITTED = 'quotation.submitted';
+
+    public const QUOTATION_WITHDRAWN = 'quotation.withdrawn';
+
+    public const QUOTATION_EXPIRED = 'quotation.expired';
+
+    public const QUOTATION_ITEM_CREATED = 'quotation.item.created';
+
+    public const QUOTATION_ITEM_UPDATED = 'quotation.item.updated';
+
+    public const QUOTATION_ITEM_DELETED = 'quotation.item.deleted';
+
     public const RFQ_APPROVED = 'rfq.approved';
 
     public const PROPOSAL_CREATED = 'proposal.created';

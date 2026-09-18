@@ -114,6 +114,14 @@ class Rfq extends Model
         return $this->hasMany(RfqDistribution::class)->orderBy('id');
     }
 
+    /**
+     * @return HasMany<Quotation, $this>
+     */
+    public function quotations(): HasMany
+    {
+        return $this->hasMany(Quotation::class)->orderBy('id');
+    }
+
     public function isEditable(): bool
     {
         return $this->status === self::STATUS_DRAFT;

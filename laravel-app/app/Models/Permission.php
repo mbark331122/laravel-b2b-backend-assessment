@@ -33,6 +33,20 @@ class Permission extends Model
 
     public const SUPPLIER_RFQ_READ = 'supplier.rfq.read';
 
+    public const QUOTATION_READ = 'quotation.read';
+
+    public const QUOTATION_CREATE = 'quotation.create';
+
+    public const QUOTATION_UPDATE = 'quotation.update';
+
+    public const QUOTATION_DELETE = 'quotation.delete';
+
+    public const QUOTATION_SUBMIT = 'quotation.submit';
+
+    public const QUOTATION_WITHDRAW = 'quotation.withdraw';
+
+    public const QUOTATION_COMPARE = 'quotation.compare';
+
     public const BANK_READ = 'bank.read';
 
     public const BANK_CHANGE_REQUEST = 'bank.change_request';
@@ -80,6 +94,13 @@ class Permission extends Model
             self::RFQ_DISTRIBUTION_CREATE,
             self::RFQ_DISTRIBUTION_WITHDRAW,
             self::SUPPLIER_RFQ_READ,
+            self::QUOTATION_READ,
+            self::QUOTATION_CREATE,
+            self::QUOTATION_UPDATE,
+            self::QUOTATION_DELETE,
+            self::QUOTATION_SUBMIT,
+            self::QUOTATION_WITHDRAW,
+            self::QUOTATION_COMPARE,
             self::BANK_READ,
             self::BANK_CHANGE_REQUEST,
             self::BANK_APPROVE,
@@ -113,6 +134,8 @@ class Permission extends Model
             self::RFQ_DISTRIBUTION_READ,
             self::RFQ_DISTRIBUTION_CREATE,
             self::RFQ_DISTRIBUTION_WITHDRAW,
+            self::QUOTATION_READ,
+            self::QUOTATION_COMPARE,
             self::BANK_READ,
             self::BANK_CHANGE_REQUEST,
             self::PRODUCT_READ,
@@ -138,6 +161,12 @@ class Permission extends Model
             self::SUPPLIER_PROFILE_CREATE,
             self::SUPPLIER_PROFILE_UPDATE,
             self::SUPPLIER_RFQ_READ,
+            self::QUOTATION_READ,
+            self::QUOTATION_CREATE,
+            self::QUOTATION_UPDATE,
+            self::QUOTATION_DELETE,
+            self::QUOTATION_SUBMIT,
+            self::QUOTATION_WITHDRAW,
         ];
     }
 

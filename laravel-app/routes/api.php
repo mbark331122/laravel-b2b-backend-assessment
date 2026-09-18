@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AiExtractionController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BankChangeRequestController;
 use App\Http\Controllers\Api\BrandController;
+use App\Http\Controllers\Api\BuyerQuotationController;
 use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProductPriceTierController;
@@ -14,6 +15,7 @@ use App\Http\Controllers\Api\RfqItemController;
 use App\Http\Controllers\Api\RfqProposalController;
 use App\Http\Controllers\Api\SupplierBankAccountController;
 use App\Http\Controllers\Api\SupplierProfileController;
+use App\Http\Controllers\Api\SupplierQuotationController;
 use App\Http\Controllers\Api\SupplierRfqController;
 use Illuminate\Support\Facades\Route;
 
@@ -31,6 +33,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/rfqs/{rfq}/distributions', [RfqDistributionController::class, 'index']);
     Route::post('/rfqs/{rfq}/distributions', [RfqDistributionController::class, 'store']);
     Route::post('/rfqs/{rfq}/distributions/{distribution}/withdraw', [RfqDistributionController::class, 'withdraw']);
+    Route::get('/rfqs/{rfq}/quotations/compare', [BuyerQuotationController::class, 'compare']);
+    Route::get('/rfqs/{rfq}/quotations', [BuyerQuotationController::class, 'index']);
+    Route::get('/rfqs/{rfq}/quotations/{quotation}', [BuyerQuotationController::class, 'show']);
     Route::post('/rfqs/{rfq}/items', [RfqItemController::class, 'store']);
     Route::put('/rfqs/{rfq}/items/{item}', [RfqItemController::class, 'update']);
     Route::patch('/rfqs/{rfq}/items/{item}', [RfqItemController::class, 'update']);
@@ -55,6 +60,17 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/supplier/rfqs', [SupplierRfqController::class, 'index']);
     Route::get('/supplier/rfqs/{rfq}', [SupplierRfqController::class, 'show']);
+    Route::post('/supplier/rfq-distributions/{distribution}/quotation', [SupplierQuotationController::class, 'store']);
+    Route::get('/supplier/quotations/{quotation}', [SupplierQuotationController::class, 'show']);
+    Route::put('/supplier/quotations/{quotation}', [SupplierQuotationController::class, 'update']);
+    Route::patch('/supplier/quotations/{quotation}', [SupplierQuotationController::class, 'update']);
+    Route::delete('/supplier/quotations/{quotation}', [SupplierQuotationController::class, 'destroy']);
+    Route::post('/supplier/quotations/{quotation}/submit', [SupplierQuotationController::class, 'submit']);
+    Route::post('/supplier/quotations/{quotation}/withdraw', [SupplierQuotationController::class, 'withdraw']);
+    Route::post('/supplier/quotations/{quotation}/items', [SupplierQuotationController::class, 'storeItem']);
+    Route::put('/supplier/quotations/{quotation}/items/{item}', [SupplierQuotationController::class, 'updateItem']);
+    Route::patch('/supplier/quotations/{quotation}/items/{item}', [SupplierQuotationController::class, 'updateItem']);
+    Route::delete('/supplier/quotations/{quotation}/items/{item}', [SupplierQuotationController::class, 'destroyItem']);
 
     Route::get('/product-categories', [ProductCategoryController::class, 'index']);
     Route::get('/brands', [BrandController::class, 'index']);
