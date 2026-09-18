@@ -111,6 +111,20 @@ class Permission extends Model
 
     public const DELIVERY_CONFIRMATION_CREATE = 'delivery_confirmation.create';
 
+    public const RMA_READ = 'rma.read';
+
+    public const RMA_CREATE = 'rma.create';
+
+    public const RMA_CANCEL = 'rma.cancel';
+
+    public const RMA_APPROVE = 'rma.approve';
+
+    public const RMA_REJECT = 'rma.reject';
+
+    public const RMA_RECEIVE = 'rma.receive';
+
+    public const RMA_CLOSE = 'rma.close';
+
     public const BANK_READ = 'bank.read';
 
     public const BANK_CHANGE_REQUEST = 'bank.change_request';
@@ -197,6 +211,13 @@ class Permission extends Model
             self::SHIPMENT_CANCEL,
             self::DELIVERY_CONFIRMATION_READ,
             self::DELIVERY_CONFIRMATION_CREATE,
+            self::RMA_READ,
+            self::RMA_CREATE,
+            self::RMA_CANCEL,
+            self::RMA_APPROVE,
+            self::RMA_REJECT,
+            self::RMA_RECEIVE,
+            self::RMA_CLOSE,
             self::BANK_READ,
             self::BANK_CHANGE_REQUEST,
             self::BANK_APPROVE,
@@ -250,6 +271,9 @@ class Permission extends Model
             self::SHIPMENT_READ,
             self::DELIVERY_CONFIRMATION_READ,
             self::DELIVERY_CONFIRMATION_CREATE,
+            self::RMA_READ,
+            self::RMA_CREATE,
+            self::RMA_CANCEL,
             self::BANK_READ,
             self::BANK_CHANGE_REQUEST,
             self::PRODUCT_READ,
@@ -306,6 +330,11 @@ class Permission extends Model
             self::SHIPMENT_DELIVER,
             self::SHIPMENT_CANCEL,
             self::DELIVERY_CONFIRMATION_READ,
+            self::RMA_READ,
+            self::RMA_APPROVE,
+            self::RMA_REJECT,
+            self::RMA_RECEIVE,
+            self::RMA_CLOSE,
         ];
     }
 

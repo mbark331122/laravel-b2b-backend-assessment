@@ -102,6 +102,18 @@ class AuditLog extends Model
 
     public const DELIVERY_CONFIRMATION_CREATED = 'delivery_confirmation.created';
 
+    public const RMA_CREATED = 'rma.created';
+
+    public const RMA_CANCELLED = 'rma.cancelled';
+
+    public const RMA_APPROVED = 'rma.approved';
+
+    public const RMA_REJECTED = 'rma.rejected';
+
+    public const RMA_RECEIVED = 'rma.received';
+
+    public const RMA_CLOSED = 'rma.closed';
+
     public const RFQ_APPROVED = 'rfq.approved';
 
     public const PROPOSAL_CREATED = 'proposal.created';

@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\RfqController;
 use App\Http\Controllers\Api\RfqDistributionController;
 use App\Http\Controllers\Api\RfqItemController;
 use App\Http\Controllers\Api\RfqProposalController;
+use App\Http\Controllers\Api\RmaController;
 use App\Http\Controllers\Api\ShipmentController;
 use App\Http\Controllers\Api\SupplierBankAccountController;
 use App\Http\Controllers\Api\SupplierProfileController;
@@ -124,6 +125,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/delivery-confirmations', [DeliveryConfirmationController::class, 'index']);
     Route::get('/delivery-confirmations/{deliveryConfirmation}', [DeliveryConfirmationController::class, 'show']);
 
+    Route::post('/shipments/{shipment}/rma', [RmaController::class, 'store']);
+    Route::get('/rmas', [RmaController::class, 'index']);
+    Route::get('/rmas/{rma}', [RmaController::class, 'show']);
+    Route::post('/rmas/{rma}/cancel', [RmaController::class, 'cancel']);
+
     Route::get('/supplier/negotiations', [NegotiationController::class, 'indexForSupplier']);
     Route::get('/supplier/negotiations/{negotiation}', [NegotiationController::class, 'show']);
     Route::get('/supplier/negotiations/{negotiation}/offers', [NegotiationController::class, 'offers']);
@@ -144,6 +150,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/supplier/delivery-confirmations', [DeliveryConfirmationController::class, 'indexForSupplier']);
     Route::get('/supplier/delivery-confirmations/{deliveryConfirmation}', [DeliveryConfirmationController::class, 'show']);
+
+    Route::get('/supplier/rmas', [RmaController::class, 'indexForSupplier']);
+    Route::get('/supplier/rmas/{rma}', [RmaController::class, 'show']);
+    Route::post('/supplier/rmas/{rma}/approve', [RmaController::class, 'approve']);
+    Route::post('/supplier/rmas/{rma}/reject', [RmaController::class, 'reject']);
+    Route::post('/supplier/rmas/{rma}/received', [RmaController::class, 'received']);
+    Route::post('/supplier/rmas/{rma}/close', [RmaController::class, 'close']);
 
     Route::get('/product-categories', [ProductCategoryController::class, 'index']);
     Route::get('/brands', [BrandController::class, 'index']);
