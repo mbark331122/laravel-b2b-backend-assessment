@@ -26,7 +26,8 @@ class RfqPolicy
     public function create(User $user): bool
     {
         return $user->hasPermission(Permission::RFQ_CREATE)
-            && $user->company_id !== null;
+            && $user->company_id !== null
+            && $user->isBuyerUser();
     }
 
     public function update(User $user, Rfq $rfq): Response

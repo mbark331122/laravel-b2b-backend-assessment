@@ -12,7 +12,7 @@ This is a single Laravel 13 API application.
 
 **Auth.** Laravel Sanctum issues API tokens. Login does not accept `company_id`. Tenant context is taken from the authenticated user (or from the owned resource for admin actions).
 
-**Tenancy.** `Company` is the tenant. Company users have a `company_id`. Admin has no company and can operate across tenants when a permission allows it. Queries and policies scope company users to their own company.
+**Tenancy.** `Company` is the tenant. Companies are classified with `is_buyer` / `is_supplier` (set only by trusted backend/seeders — not client input). Company users have a `company_id`. Admin has no company and can operate across tenants when a permission allows it. Queries and policies scope company users to their own company. RFQ creation additionally requires a buyer company.
 
 **Authorization.** Roles (`admin`, `company_user`) own permissions. Policies enforce permission + tenant on every sensitive operation.
 
@@ -52,13 +52,14 @@ Tests use an in-memory SQLite database (`phpunit.xml`). They do not need the fil
 
 ### Seeded credentials (development only)
 
-| User | Email | Password | Company | Role |
-| --- | --- | --- | --- | --- |
-| User A | user.a@example.com | password | Company A | company_user |
-| User B | user.b@example.com | password | Company B | company_user |
-| Admin User | admin@example.com | password | none | admin |
+| User | Email | Password | Company | Classification | Role |
+| --- | --- | --- | --- | --- | --- |
+| User A | user.a@example.com | password | Company A | buyer | company_user |
+| User B | user.b@example.com | password | Company B | buyer | company_user |
+| Supplier User | supplier.user@example.com | password | Supplier Company | supplier | company_user |
+| Admin User | admin@example.com | password | none | none | admin |
 
-Seeded suppliers: Supplier A (Company A) and Supplier B (Company B), each with one active bank account.
+Seeded suppliers: Supplier A (Company A) and Supplier B (Company B), each with one active bank account. These are tenant-owned bank records for the existing banking workflow — not the Sprint 2 supplier catalog.
 
 ### Auth
 

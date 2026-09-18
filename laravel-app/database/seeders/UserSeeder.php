@@ -15,6 +15,8 @@ class UserSeeder extends Seeder
 
     public const USER_B_EMAIL = 'user.b@example.com';
 
+    public const SUPPLIER_USER_EMAIL = 'supplier.user@example.com';
+
     public const ADMIN_EMAIL = 'admin@example.com';
 
     public function run(): void
@@ -24,9 +26,11 @@ class UserSeeder extends Seeder
 
         $companyA = Company::query()->where('name', CompanySeeder::COMPANY_A)->firstOrFail();
         $companyB = Company::query()->where('name', CompanySeeder::COMPANY_B)->firstOrFail();
+        $supplierCompany = Company::query()->where('name', CompanySeeder::SUPPLIER_COMPANY)->firstOrFail();
 
         $this->createUser('User A', self::USER_A_EMAIL, $companyUserRole, $companyA);
         $this->createUser('User B', self::USER_B_EMAIL, $companyUserRole, $companyB);
+        $this->createUser('Supplier User', self::SUPPLIER_USER_EMAIL, $companyUserRole, $supplierCompany);
         $this->createUser('Admin User', self::ADMIN_EMAIL, $adminRole);
     }
 

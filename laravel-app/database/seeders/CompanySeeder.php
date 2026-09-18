@@ -11,9 +11,20 @@ class CompanySeeder extends Seeder
 
     public const COMPANY_B = 'Company B';
 
+    public const SUPPLIER_COMPANY = 'Supplier Company';
+
     public function run(): void
     {
-        Company::query()->firstOrCreate(['name' => self::COMPANY_A]);
-        Company::query()->firstOrCreate(['name' => self::COMPANY_B]);
+        $this->seedCompany(self::COMPANY_A, isBuyer: true, isSupplier: false);
+        $this->seedCompany(self::COMPANY_B, isBuyer: true, isSupplier: false);
+        $this->seedCompany(self::SUPPLIER_COMPANY, isBuyer: false, isSupplier: true);
+    }
+
+    private function seedCompany(string $name, bool $isBuyer, bool $isSupplier): void
+    {
+        $company = Company::query()->firstOrNew(['name' => $name]);
+        $company->is_buyer = $isBuyer;
+        $company->is_supplier = $isSupplier;
+        $company->save();
     }
 }

@@ -24,6 +24,11 @@ class Permission extends Model
     public const BANK_APPROVE = 'bank.approve';
 
     /**
+     * Platform permission catalog.
+     *
+     * Naming convention for future domains: `{domain}.{action}` (e.g. `quotation.create`).
+     * Do not rename or remove the minimum RFQ/bank permissions below.
+     *
      * @return list<string>
      */
     public static function names(): array
