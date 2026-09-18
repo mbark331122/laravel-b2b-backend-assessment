@@ -60,6 +60,18 @@ class AuditLog extends Model
 
     public const NEGOTIATION_EXPIRED = 'negotiation.expired';
 
+    public const PURCHASE_ORDER_CREATED = 'purchase_order.created';
+
+    public const PURCHASE_ORDER_SUBMITTED = 'purchase_order.submitted';
+
+    public const PURCHASE_ORDER_CONFIRMED = 'purchase_order.confirmed';
+
+    public const PURCHASE_ORDER_REJECTED = 'purchase_order.rejected';
+
+    public const PURCHASE_ORDER_CANCELLED = 'purchase_order.cancelled';
+
+    public const PURCHASE_ORDER_COMPLETED = 'purchase_order.completed';
+
     public const RFQ_APPROVED = 'rfq.approved';
 
     public const PROPOSAL_CREATED = 'proposal.created';

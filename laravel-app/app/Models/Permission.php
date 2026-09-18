@@ -59,6 +59,20 @@ class Permission extends Model
 
     public const NEGOTIATION_WITHDRAW = 'negotiation.withdraw';
 
+    public const PURCHASE_ORDER_READ = 'purchase_order.read';
+
+    public const PURCHASE_ORDER_CREATE = 'purchase_order.create';
+
+    public const PURCHASE_ORDER_SUBMIT = 'purchase_order.submit';
+
+    public const PURCHASE_ORDER_CANCEL = 'purchase_order.cancel';
+
+    public const PURCHASE_ORDER_CONFIRM = 'purchase_order.confirm';
+
+    public const PURCHASE_ORDER_REJECT = 'purchase_order.reject';
+
+    public const PURCHASE_ORDER_COMPLETE = 'purchase_order.complete';
+
     public const BANK_READ = 'bank.read';
 
     public const BANK_CHANGE_REQUEST = 'bank.change_request';
@@ -119,6 +133,13 @@ class Permission extends Model
             self::NEGOTIATION_OFFER_ACCEPT,
             self::NEGOTIATION_REJECT,
             self::NEGOTIATION_WITHDRAW,
+            self::PURCHASE_ORDER_READ,
+            self::PURCHASE_ORDER_CREATE,
+            self::PURCHASE_ORDER_SUBMIT,
+            self::PURCHASE_ORDER_CANCEL,
+            self::PURCHASE_ORDER_CONFIRM,
+            self::PURCHASE_ORDER_REJECT,
+            self::PURCHASE_ORDER_COMPLETE,
             self::BANK_READ,
             self::BANK_CHANGE_REQUEST,
             self::BANK_APPROVE,
@@ -160,6 +181,11 @@ class Permission extends Model
             self::NEGOTIATION_OFFER_ACCEPT,
             self::NEGOTIATION_REJECT,
             self::NEGOTIATION_WITHDRAW,
+            self::PURCHASE_ORDER_READ,
+            self::PURCHASE_ORDER_CREATE,
+            self::PURCHASE_ORDER_SUBMIT,
+            self::PURCHASE_ORDER_CANCEL,
+            self::PURCHASE_ORDER_COMPLETE,
             self::BANK_READ,
             self::BANK_CHANGE_REQUEST,
             self::PRODUCT_READ,
@@ -197,6 +223,9 @@ class Permission extends Model
             self::NEGOTIATION_OFFER_ACCEPT,
             self::NEGOTIATION_REJECT,
             self::NEGOTIATION_WITHDRAW,
+            self::PURCHASE_ORDER_READ,
+            self::PURCHASE_ORDER_CONFIRM,
+            self::PURCHASE_ORDER_REJECT,
         ];
     }
 

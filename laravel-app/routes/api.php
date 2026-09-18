@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProductPriceTierController;
 use App\Http\Controllers\Api\ProductSpecificationController;
+use App\Http\Controllers\Api\PurchaseOrderController;
 use App\Http\Controllers\Api\RfqController;
 use App\Http\Controllers\Api\RfqDistributionController;
 use App\Http\Controllers\Api\RfqItemController;
@@ -81,10 +82,22 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/negotiations/{negotiation}/offers/{offer}/accept', [NegotiationController::class, 'acceptOffer']);
     Route::post('/negotiations/{negotiation}/reject', [NegotiationController::class, 'reject']);
     Route::post('/negotiations/{negotiation}/withdraw', [NegotiationController::class, 'withdraw']);
+    Route::post('/negotiations/{negotiation}/purchase-order', [PurchaseOrderController::class, 'store']);
+
+    Route::get('/purchase-orders', [PurchaseOrderController::class, 'index']);
+    Route::get('/purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'show']);
+    Route::post('/purchase-orders/{purchaseOrder}/submit', [PurchaseOrderController::class, 'submit']);
+    Route::post('/purchase-orders/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel']);
+    Route::post('/purchase-orders/{purchaseOrder}/complete', [PurchaseOrderController::class, 'complete']);
 
     Route::get('/supplier/negotiations', [NegotiationController::class, 'indexForSupplier']);
     Route::get('/supplier/negotiations/{negotiation}', [NegotiationController::class, 'show']);
     Route::get('/supplier/negotiations/{negotiation}/offers', [NegotiationController::class, 'offers']);
+
+    Route::get('/supplier/purchase-orders', [PurchaseOrderController::class, 'indexForSupplier']);
+    Route::get('/supplier/purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'show']);
+    Route::post('/supplier/purchase-orders/{purchaseOrder}/confirm', [PurchaseOrderController::class, 'confirm']);
+    Route::post('/supplier/purchase-orders/{purchaseOrder}/reject', [PurchaseOrderController::class, 'reject']);
 
     Route::get('/product-categories', [ProductCategoryController::class, 'index']);
     Route::get('/brands', [BrandController::class, 'index']);
