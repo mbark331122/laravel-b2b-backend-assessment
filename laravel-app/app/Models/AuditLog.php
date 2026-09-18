@@ -124,6 +124,22 @@ class AuditLog extends Model
 
     public const RETURN_SHIPMENT_CANCELLED = 'return_shipment.cancelled';
 
+    public const CREDIT_NOTE_CREATED = 'credit_note.created';
+
+    public const CREDIT_NOTE_ISSUED = 'credit_note.issued';
+
+    public const CREDIT_NOTE_CANCELLED = 'credit_note.cancelled';
+
+    public const CREDIT_NOTE_VOIDED = 'credit_note.voided';
+
+    public const REFUND_CREATED = 'refund.created';
+
+    public const REFUND_PROCESSED = 'refund.processed';
+
+    public const REFUND_FAILED = 'refund.failed';
+
+    public const REFUND_CANCELLED = 'refund.cancelled';
+
     public const RFQ_APPROVED = 'rfq.approved';
 
     public const PROPOSAL_CREATED = 'proposal.created';

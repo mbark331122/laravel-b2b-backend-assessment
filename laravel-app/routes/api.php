@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BankChangeRequestController;
 use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\BuyerQuotationController;
+use App\Http\Controllers\Api\CreditNoteController;
 use App\Http\Controllers\Api\DeliveryConfirmationController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\NegotiationController;
@@ -14,6 +15,7 @@ use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProductPriceTierController;
 use App\Http\Controllers\Api\ProductSpecificationController;
 use App\Http\Controllers\Api\PurchaseOrderController;
+use App\Http\Controllers\Api\RefundController;
 use App\Http\Controllers\Api\ReturnShipmentController;
 use App\Http\Controllers\Api\RfqController;
 use App\Http\Controllers\Api\RfqDistributionController;
@@ -132,6 +134,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/rmas/{rma}/cancel', [RmaController::class, 'cancel']);
     Route::post('/rmas/{rma}/return-shipment', [ReturnShipmentController::class, 'store']);
     Route::get('/rmas/{rma}/return-shipment', [ReturnShipmentController::class, 'showForRma']);
+    Route::post('/rmas/{rma}/credit-note', [CreditNoteController::class, 'store']);
+    Route::get('/rmas/{rma}/credit-note', [CreditNoteController::class, 'showForRma']);
 
     Route::get('/return-shipments', [ReturnShipmentController::class, 'index']);
     Route::get('/return-shipments/{returnShipment}', [ReturnShipmentController::class, 'show']);
@@ -139,6 +143,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/return-shipments/{returnShipment}/ship', [ReturnShipmentController::class, 'ship']);
     Route::post('/return-shipments/{returnShipment}/deliver', [ReturnShipmentController::class, 'deliver']);
     Route::post('/return-shipments/{returnShipment}/cancel', [ReturnShipmentController::class, 'cancel']);
+
+    Route::get('/credit-notes', [CreditNoteController::class, 'index']);
+    Route::get('/credit-notes/{creditNote}', [CreditNoteController::class, 'show']);
+    Route::post('/credit-notes/{creditNote}/issue', [CreditNoteController::class, 'issue']);
+    Route::post('/credit-notes/{creditNote}/cancel', [CreditNoteController::class, 'cancel']);
+    Route::post('/credit-notes/{creditNote}/void', [CreditNoteController::class, 'void']);
+    Route::post('/credit-notes/{creditNote}/refund', [RefundController::class, 'store']);
+
+    Route::get('/refunds', [RefundController::class, 'index']);
+    Route::get('/refunds/{refund}', [RefundController::class, 'show']);
+    Route::post('/refunds/{refund}/process', [RefundController::class, 'process']);
+    Route::post('/refunds/{refund}/fail', [RefundController::class, 'fail']);
+    Route::post('/refunds/{refund}/cancel', [RefundController::class, 'cancel']);
 
     Route::get('/supplier/negotiations', [NegotiationController::class, 'indexForSupplier']);
     Route::get('/supplier/negotiations/{negotiation}', [NegotiationController::class, 'show']);
@@ -170,6 +187,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/supplier/return-shipments', [ReturnShipmentController::class, 'indexForSupplier']);
     Route::get('/supplier/return-shipments/{returnShipment}', [ReturnShipmentController::class, 'show']);
+
+    Route::get('/supplier/credit-notes', [CreditNoteController::class, 'indexForSupplier']);
+    Route::get('/supplier/credit-notes/{creditNote}', [CreditNoteController::class, 'show']);
+
+    Route::get('/supplier/refunds', [RefundController::class, 'indexForSupplier']);
+    Route::get('/supplier/refunds/{refund}', [RefundController::class, 'show']);
 
     Route::get('/product-categories', [ProductCategoryController::class, 'index']);
     Route::get('/brands', [BrandController::class, 'index']);

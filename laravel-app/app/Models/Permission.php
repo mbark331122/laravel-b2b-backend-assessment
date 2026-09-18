@@ -137,6 +137,26 @@ class Permission extends Model
 
     public const RETURN_SHIPMENT_DELIVER = 'return_shipment.deliver';
 
+    public const CREDIT_NOTE_READ = 'credit_note.read';
+
+    public const CREDIT_NOTE_CREATE = 'credit_note.create';
+
+    public const CREDIT_NOTE_ISSUE = 'credit_note.issue';
+
+    public const CREDIT_NOTE_CANCEL = 'credit_note.cancel';
+
+    public const CREDIT_NOTE_VOID = 'credit_note.void';
+
+    public const REFUND_READ = 'refund.read';
+
+    public const REFUND_CREATE = 'refund.create';
+
+    public const REFUND_PROCESS = 'refund.process';
+
+    public const REFUND_FAIL = 'refund.fail';
+
+    public const REFUND_CANCEL = 'refund.cancel';
+
     public const BANK_READ = 'bank.read';
 
     public const BANK_CHANGE_REQUEST = 'bank.change_request';
@@ -236,6 +256,16 @@ class Permission extends Model
             self::RETURN_SHIPMENT_CANCEL,
             self::RETURN_SHIPMENT_SHIP,
             self::RETURN_SHIPMENT_DELIVER,
+            self::CREDIT_NOTE_READ,
+            self::CREDIT_NOTE_CREATE,
+            self::CREDIT_NOTE_ISSUE,
+            self::CREDIT_NOTE_CANCEL,
+            self::CREDIT_NOTE_VOID,
+            self::REFUND_READ,
+            self::REFUND_CREATE,
+            self::REFUND_PROCESS,
+            self::REFUND_FAIL,
+            self::REFUND_CANCEL,
             self::BANK_READ,
             self::BANK_CHANGE_REQUEST,
             self::BANK_APPROVE,
@@ -296,6 +326,8 @@ class Permission extends Model
             self::RETURN_SHIPMENT_CREATE,
             self::RETURN_SHIPMENT_UPDATE,
             self::RETURN_SHIPMENT_CANCEL,
+            self::CREDIT_NOTE_READ,
+            self::REFUND_READ,
             self::BANK_READ,
             self::BANK_CHANGE_REQUEST,
             self::PRODUCT_READ,
@@ -360,6 +392,16 @@ class Permission extends Model
             self::RETURN_SHIPMENT_READ,
             self::RETURN_SHIPMENT_SHIP,
             self::RETURN_SHIPMENT_DELIVER,
+            self::CREDIT_NOTE_READ,
+            self::CREDIT_NOTE_CREATE,
+            self::CREDIT_NOTE_ISSUE,
+            self::CREDIT_NOTE_CANCEL,
+            self::CREDIT_NOTE_VOID,
+            self::REFUND_READ,
+            self::REFUND_CREATE,
+            self::REFUND_PROCESS,
+            self::REFUND_FAIL,
+            self::REFUND_CANCEL,
         ];
     }
 

@@ -1,6 +1,6 @@
 # Laravel Mini B2B Backend
 
-B2B procurement and supplier commerce API (multi-tenant). Current codebase includes identity/tenancy, supplier profiles, wholesale product catalog, RFQs, supplier matching & distribution, quotations, negotiation with immutable counter-offers, purchase orders with supplier confirmation, commercial invoices (snapshotted from confirmed POs), payment foundation (manual lifecycle, no gateway), shipping & fulfillment foundation (one shipment per confirmed PO, no carrier APIs), buyer delivery confirmation (immutable receipt acknowledgment), returns/RMA foundation (buyer request + supplier review; no refunds), RMA return logistics (return shipments for approved RMAs; no carrier APIs), mocked AI extraction with human approval, supplier bank-change approval, and auditability — with a fixed sprint roadmap for the full commercial lifecycle.
+B2B procurement and supplier commerce API (multi-tenant). Current codebase includes identity/tenancy, supplier profiles, wholesale product catalog, RFQs, supplier matching & distribution, quotations, negotiation with immutable counter-offers, purchase orders with supplier confirmation, commercial invoices (snapshotted from confirmed POs), payment foundation (manual lifecycle, no gateway), shipping & fulfillment foundation (one shipment per confirmed PO, no carrier APIs), buyer delivery confirmation (immutable receipt acknowledgment), returns/RMA foundation (buyer request + supplier review), RMA return logistics (return shipments for approved RMAs; no carrier APIs), RMA financial resolution foundation (credit notes + internal refund records after closed RMA; no external money movement), mocked AI extraction with human approval, supplier bank-change approval, and auditability — with a fixed sprint roadmap for the full commercial lifecycle.
 
 There is no frontend. The API is the product.
 
@@ -28,9 +28,9 @@ This is a single Laravel 13 API application.
 
 **Purchase Orders.** Buyers create a PO only from an **accepted** negotiation (`POST /api/negotiations/{negotiation}/purchase-order`). Commercial terms are snapshotted from the accepted offer (immutable). One PO per negotiation (unique `negotiation_id`); idempotent re-create returns the existing PO. Server-generated unique `number` (`PO-{YEAR}-{id}`). Lifecycle: `draft` → `pending_supplier_confirmation` → `confirmed` → `completed` (or `rejected` / `cancelled`). Supplier confirms/rejects after submit; buyer cancels while draft/pending; buyer completes confirmed POs.
 
-**Commercial Invoices.** Suppliers create an invoice only from a **confirmed** purchase order (`POST /api/purchase-orders/{purchaseOrder}/invoice`). Commercial values are snapshotted from the confirmed PO (immutable after create). One invoice per PO (unique `purchase_order_id`); idempotent re-create returns the existing invoice. Server-generated unique `number` (`INV-{YEAR}-{id}`). Lifecycle: `draft` → `issued` | `cancelled`; `issued` → `voided` | `paid` (`paid` only via payment mark-paid). No ZATCA, tax engines, credit notes, refunds, shipping, or fulfillment.
+**Commercial Invoices.** Suppliers create an invoice only from a **confirmed** purchase order (`POST /api/purchase-orders/{purchaseOrder}/invoice`). Commercial values are snapshotted from the confirmed PO (immutable after create). One invoice per PO (unique `purchase_order_id`); idempotent re-create returns the existing invoice. Server-generated unique `number` (`INV-{YEAR}-{id}`). Lifecycle: `draft` → `issued` | `cancelled`; `issued` → `voided` | `paid` (`paid` only via payment mark-paid). No ZATCA, tax engines, shipping, or fulfillment. Credit notes / refunds are a separate financial-resolution domain (Sprint 15).
 
-**Payments (foundation).** Buyers create a payment only for an **issued** invoice (`POST /api/invoices/{invoice}/payment`). Amount and currency are taken from the invoice total (client amounts ignored). Server-generated unique `number` (`PAY-{YEAR}-{id}`). Methods: `bank_transfer` / `cash` / `manual` (provider-independent labels only). Lifecycle: `pending` → `paid` | `failed` | `cancelled`. At most one pending payment per invoice (`active_lock`); after failed/cancelled a new payment may be created; a paid invoice cannot receive another payment. Supplier marks paid/failed (manual bookkeeping); buyer may cancel pending. Marking paid also transitions the invoice to `paid`. **No payment gateway, webhooks, wallets, bank APIs, refunds, or partial payments.**
+**Payments (foundation).** Buyers create a payment only for an **issued** invoice (`POST /api/invoices/{invoice}/payment`). Amount and currency are taken from the invoice total (client amounts ignored). Server-generated unique `number` (`PAY-{YEAR}-{id}`). Methods: `bank_transfer` / `cash` / `manual` (provider-independent labels only). Lifecycle: `pending` → `paid` | `failed` | `cancelled`. At most one pending payment per invoice (`active_lock`); after failed/cancelled a new payment may be created; a paid invoice cannot receive another payment. Supplier marks paid/failed (manual bookkeeping); buyer may cancel pending. Marking paid also transitions the invoice to `paid`. **No payment gateway, webhooks, wallets, bank APIs, or partial payments.** Internal refund records (Sprint 15) do not mutate payment amounts.
 
 **Shipments (fulfillment foundation).** Suppliers create a shipment only from a **confirmed** purchase order (`POST /api/purchase-orders/{purchaseOrder}/shipment`). One shipment per PO (unique `purchase_order_id`); idempotent re-create returns the existing shipment. Server-generated unique `number` (`SHP-{YEAR}-{id}`). Line items and commercial values are snapshotted from the confirmed PO (full qty; no partial/split shipments). Immutable origin/destination address snapshots. Carrier / tracking / shipping_method are manual informational fields only. Lifecycle: `pending` → `processing` → `shipped` → `delivered`, or `pending`/`processing` → `cancelled`. Operational metadata updatable only while `pending`/`processing`. Independent of payment state. **No carrier APIs, tracking webhooks, warehouses, inventory, packages, or rate calculation.**
 
@@ -39,6 +39,8 @@ This is a single Laravel 13 API application.
 **Returns / RMA.** Buyers create an RMA only for a **delivered** shipment that already has a delivery confirmation (`POST /api/shipments/{shipment}/rma`). One **active** RMA per shipment (`active_lock`); a new RMA may be created only after the previous reaches `rejected` / `cancelled` / `closed`. Server-generated unique `number` (`RMA-{YEAR}-{id}`). Items snapshot shipment lines; return qty must be > 0 and ≤ shipped qty. Lifecycle: `requested` → `approved`|`rejected`|`cancelled`; `approved` → `received` → `closed`. Buyer cancels while requested; supplier approves/rejects/receives/closes. Does **not** refund payments, create credit notes, modify invoices/payments, change inventory, or create return shipments automatically.
 
 **RMA Return Logistics.** Buyers create a return shipment only for an **approved** RMA (`POST /api/rmas/{rma}/return-shipment`). One **active** return shipment per RMA (`active_lock`). Server-generated unique `number` (`RMA-RET-{YEAR}-{id}`). Items must belong to the RMA; qty ≤ RMA item qty; price snapshots from original shipment lines. Origin = buyer return address; destination = supplier. Lifecycle: `pending` → `shipped` → `delivered`, or `pending`/`shipped` → `cancelled`. Buyer updates logistics while pending and may cancel; supplier marks shipped/delivered. Does **not** auto-mark RMA received/closed, refund, or change inventory. **No carrier APIs or tracking webhooks.**
+
+**RMA Financial Resolution.** Suppliers create a credit note only for a **closed** RMA that has a **delivered** return shipment (`POST /api/rmas/{rma}/credit-note`). Quantities come from RMA items; unit prices and currency from the original invoice snapshots; tax is proportional to returned merchandise subtotal. One credit note per RMA (unique `rma_id`); idempotent re-create returns the existing note. Server-generated unique `number` (`CN-{YEAR}-{id}`). Lifecycle: `draft` → `issued` | `cancelled`; `issued` → `voided`. After issue, suppliers may create an **internal** refund record (`POST /api/credit-notes/{creditNote}/refund`) for a paid payment on the same invoice chain — amount = credit note total (≤ paid amount). One refund per credit note (unique `credit_note_id`); number `REF-{YEAR}-{id}`. Refund lifecycle: `pending` → `processed` | `failed` | `cancelled`. **“Processed” means recorded internally — not an external bank/gateway transfer.** Does **not** mutate invoice totals, payment amounts, PO, RMA, shipment, return shipment, or inventory. **No payment gateways, bank APIs, wallets, partial/split refunds, currency conversion, or ZATCA.**
 
 **AI.** `MockAiExtractor` parses text only. It never receives or writes an RFQ. `AiExtractionService` stores an extraction and, when a field differs, a pending `RfqProposal`. Official RFQ fields change only in `RfqProposal::approve()`, using the stored proposed value.
 
@@ -140,7 +142,7 @@ AuditLog → actor (User), company (Company), auditable (morph)
 
 - **Companies** — tenants with buyer/supplier classification (`is_buyer`, `is_supplier`). Seeded: Company A/B (buyer), Supplier Company / Supplier Company B (supplier).
 - **Users** — `company_id` nullable (admin is null). `role_id` required. `company_id` / `role_id` are not fillable. Classification is read from the user's company.
-- **Roles / Permissions** — `admin` has all permissions. `company_user` has buyer RFQ/quotation/negotiation permissions plus `purchase_order.read|create|submit|cancel|complete`, `invoice.read`, `payment.read|create|cancel`, `shipment.read`, `delivery_confirmation.read|create`, `rma.read|create|cancel`, and `return_shipment.read|create|update|cancel`. `supplier_user` has catalog/quotation/negotiation permissions plus `purchase_order.read|confirm|reject`, `invoice.read|create|issue|cancel|void`, `payment.read|mark_paid|mark_failed`, `shipment.read|create|update|process|ship|deliver|cancel`, `delivery_confirmation.read`, `rma.read|approve|reject|receive|close`, and `return_shipment.read|ship|deliver`. Platform-only: `brand.create`, `product.review`.
+- **Roles / Permissions** — `admin` has all permissions. `company_user` has buyer RFQ/quotation/negotiation permissions plus `purchase_order.read|create|submit|cancel|complete`, `invoice.read`, `payment.read|create|cancel`, `shipment.read`, `delivery_confirmation.read|create`, `rma.read|create|cancel`, `return_shipment.read|create|update|cancel`, and `credit_note.read` / `refund.read`. `supplier_user` has catalog/quotation/negotiation permissions plus `purchase_order.read|confirm|reject`, `invoice.read|create|issue|cancel|void`, `payment.read|mark_paid|mark_failed`, `shipment.read|create|update|process|ship|deliver|cancel`, `delivery_confirmation.read`, `rma.read|approve|reject|receive|close`, `return_shipment.read|ship|deliver`, `credit_note.read|create|issue|cancel|void`, and `refund.read|create|process|fail|cancel`. Platform-only: `brand.create`, `product.review`.
 - **Supplier Profiles** — one profile per supplier company (`display_name`, description, contact, status). Buyer discovery via `GET /api/supplier-profiles` returns only eligible suppliers (`status=active` + `company.is_supplier=true`), filterable by `q`, `product_category_id`, `brand_id`, `product_q`.
 - **Brands** — platform-level (`name`, `slug`, status). Readable with `product.read`; create requires `brand.create`.
 - **Product Categories** — platform-level categories (`name`, status).
@@ -165,6 +167,9 @@ AuditLog → actor (User), company (Company), auditable (morph)
 - **RMA Items** — immutable snapshots from shipment items with validated return quantities.
 - **Return Shipments** — buyer-created logistics for approved RMAs; unique `number`; one active per RMA; lifecycle `pending` / `shipped` / `delivered` / `cancelled`.
 - **Return Shipment Items** — immutable snapshots from RMA/shipment items with validated quantities and price snapshots.
+- **Credit Notes** — supplier-created from closed RMA + delivered return shipment; unique `number`; one per RMA; qty from RMA / prices from invoice snapshots; lifecycle `draft` / `issued` / `cancelled` / `voided`.
+- **Credit Note Items** — immutable historical lines (`unit_price_snapshot`, `line_total_snapshot`, `product_snapshot`).
+- **Refunds** — internal financial records from issued credit notes against a paid payment; unique `number`; one per credit note; amount = credit note total; lifecycle `pending` / `processed` / `failed` / `cancelled`. Not external money movement.
 - **AI Extractions** — proposed fields, confidence, source (`AI/mock`), status. Belongs to an RFQ. Does not replace the official RFQ.
 - **RFQ Proposals** — field-level conflict: current value, proposed value, source, confidence, status (`pending` / `approved` / `rejected`).
 - **Suppliers** — minimal tenant-owned record for bank data (not the catalog profile).
@@ -193,6 +198,8 @@ Tenant context is never taken from a client `company_id`.
 - Delivery confirmation relationships and confirming user are derived from the delivered shipment and authenticated buyer. Client ownership IDs / `number` / status / `confirmed_at` are ignored. Immutable after create.
 - RMA relationships and items are derived from the delivered shipment + delivery confirmation. Client ownership IDs / `number` / status / product IDs are ignored. Buyer creates/cancels; supplier reviews. Does not mutate shipment/PO/invoice/payment.
 - Return shipment relationships and items are derived from the approved RMA. Client ownership IDs / `number` / status are ignored. Buyer creates/updates/cancels; supplier ships/delivers. Does not auto-change RMA/invoice/payment.
+- Credit note relationships, currency, and totals are derived from the closed RMA → invoice chain. Client ownership IDs / `number` / money fields / status are ignored. Buyer reads only; supplier creates/issues/cancels/voids only their own. Does not mutate invoice/payment/PO/RMA.
+- Refund relationships, amount, and currency are derived from the issued credit note and paid payment. Client ownership IDs / `number` / amount / currency / status / `payment_id` are ignored. Buyer reads only; supplier creates/processes/fails/cancels. Does not execute external transfers or rewrite payment amounts.
 
 ## AI Safety
 
@@ -251,6 +258,8 @@ Important mutations are logged. Reads are not.
 | `delivery_confirmation.created` | Buyer confirms delivered shipment receipt |
 | `rma.created` / `cancelled` / `approved` / `rejected` / `received` / `closed` | RMA lifecycle |
 | `return_shipment.created` / `updated` / `shipped` / `delivered` / `cancelled` | Return shipment lifecycle |
+| `credit_note.created` / `issued` / `cancelled` / `voided` | Credit note lifecycle |
+| `refund.created` / `processed` / `failed` / `cancelled` | Internal refund record lifecycle |
 | `rfq.approved` | Official RFQ changed by proposal approval |
 | `proposal.created` | A conflicting proposal is stored |
 | `proposal.approved` / `proposal.rejected` | Proposal resolved |
@@ -371,12 +380,25 @@ All routes below except login require `auth:sanctum`.
 | `POST` | `/api/rmas/{rma}/cancel` | `rma.cancel` (requested only) |
 | `POST` | `/api/rmas/{rma}/return-shipment` | `return_shipment.create` (approved RMA; buyer; idempotent active) |
 | `GET` | `/api/rmas/{rma}/return-shipment` | `return_shipment.read` |
+| `POST` | `/api/rmas/{rma}/credit-note` | `credit_note.create` (closed RMA + delivered return; supplier; idempotent) |
+| `GET` | `/api/rmas/{rma}/credit-note` | `credit_note.read` |
 | `GET` | `/api/return-shipments` | `return_shipment.read` (buyer company) |
 | `GET` | `/api/return-shipments/{returnShipment}` | `return_shipment.read` |
 | `PATCH` | `/api/return-shipments/{returnShipment}` | `return_shipment.update` (pending only) |
 | `POST` | `/api/return-shipments/{returnShipment}/ship` | `return_shipment.ship` |
 | `POST` | `/api/return-shipments/{returnShipment}/deliver` | `return_shipment.deliver` |
 | `POST` | `/api/return-shipments/{returnShipment}/cancel` | `return_shipment.cancel` |
+| `GET` | `/api/credit-notes` | `credit_note.read` (buyer company) |
+| `GET` | `/api/credit-notes/{creditNote}` | `credit_note.read` |
+| `POST` | `/api/credit-notes/{creditNote}/issue` | `credit_note.issue` |
+| `POST` | `/api/credit-notes/{creditNote}/cancel` | `credit_note.cancel` |
+| `POST` | `/api/credit-notes/{creditNote}/void` | `credit_note.void` (requires `reason`) |
+| `POST` | `/api/credit-notes/{creditNote}/refund` | `refund.create` (issued credit note + paid payment; idempotent) |
+| `GET` | `/api/refunds` | `refund.read` (buyer company) |
+| `GET` | `/api/refunds/{refund}` | `refund.read` |
+| `POST` | `/api/refunds/{refund}/process` | `refund.process` |
+| `POST` | `/api/refunds/{refund}/fail` | `refund.fail` |
+| `POST` | `/api/refunds/{refund}/cancel` | `refund.cancel` |
 | `GET` | `/api/supplier/invoices` | `invoice.read` (supplier company invoices) |
 | `GET` | `/api/supplier/invoices/{invoice}` | `invoice.read` |
 | `GET` | `/api/supplier/payments` | `payment.read` (supplier company payments) |
@@ -393,6 +415,10 @@ All routes below except login require `auth:sanctum`.
 | `POST` | `/api/supplier/rmas/{rma}/close` | `rma.close` |
 | `GET` | `/api/supplier/return-shipments` | `return_shipment.read` (supplier company) |
 | `GET` | `/api/supplier/return-shipments/{returnShipment}` | `return_shipment.read` |
+| `GET` | `/api/supplier/credit-notes` | `credit_note.read` (supplier company) |
+| `GET` | `/api/supplier/credit-notes/{creditNote}` | `credit_note.read` |
+| `GET` | `/api/supplier/refunds` | `refund.read` (supplier company) |
+| `GET` | `/api/supplier/refunds/{refund}` | `refund.read` |
 | `GET` | `/api/product-categories` | `product.read` |
 | `GET` | `/api/brands` | `product.read` |
 | `POST` | `/api/brands` | `brand.create` |
@@ -411,7 +437,7 @@ All routes below except login require `auth:sanctum`.
 php artisan test
 ```
 
-Latest full run: **227 tests**, **2255 assertions**, **0 failures**, **0 errors**, **0 skipped**.
+Latest full run: see Sprint 15 documentation commit for updated counts after this sprint.
 
 Coverage includes:
 
@@ -437,10 +463,15 @@ Coverage includes:
 - RMA quantity validation and active-RMA uniqueness
 - Return shipment for approved RMA; ship/deliver/cancel lifecycle
 - Return shipment item quantity and ownership validation
+- Credit note from closed RMA + delivered return; qty/price snapshots
+- Credit note lifecycle draft → issued | cancelled; issued → voided
+- Internal refund from issued credit note + paid payment
+- Refund lifecycle pending → processed | failed | cancelled
+- Credit note / refund isolation, spoofing defenses, and permission checks
 - Cross-company isolation and spoofing defenses
 - AI extraction / proposals / bank change / audit trails
 
-**Not implemented:** payment gateways, refunds, credit notes, invoice/payment mutation from RMA/return shipment, carrier APIs, tracking webhooks, warehouses, inventory, packages, split/partial shipments, disputes, ratings/reviews, escrow, replacement/exchange orders, ZATCA / e-invoicing, VAT/tax calculation engines, B2C checkout.
+**Not implemented:** payment gateways, bank APIs, wallets, external refund execution/webhooks, partial/split refund engines, currency conversion, invoice/payment amount mutation from credit notes/refunds, carrier APIs, tracking webhooks, warehouses, inventory, packages, split/partial shipments, disputes, ratings/reviews, escrow, replacement/exchange orders, ZATCA / e-invoicing, VAT/tax calculation engines, B2C checkout.
 
 ## AI / Cursor Usage
 

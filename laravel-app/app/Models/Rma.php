@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 use InvalidArgumentException;
 
 #[Fillable([])]
@@ -194,6 +195,24 @@ class Rma extends Model
     public function returnShipment(): HasOne
     {
         return $this->hasOne(ReturnShipment::class)->latestOfMany();
+    }
+
+    /**
+     * @return HasOne<CreditNote, $this>
+     */
+    public function creditNote(): HasOne
+    {
+        return $this->hasOne(CreditNote::class);
+    }
+
+    /**
+     * Refund associated via the RMA credit note when present.
+     *
+     * @return HasOneThrough<Refund, CreditNote, $this>
+     */
+    public function refund(): HasOneThrough
+    {
+        return $this->hasOneThrough(Refund::class, CreditNote::class);
     }
 
     public function isActive(): bool
