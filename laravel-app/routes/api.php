@@ -3,9 +3,12 @@
 use App\Http\Controllers\Api\AiExtractionController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BankChangeRequestController;
+use App\Http\Controllers\Api\ProductCategoryController;
+use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\RfqController;
 use App\Http\Controllers\Api\RfqProposalController;
 use App\Http\Controllers\Api\SupplierBankAccountController;
+use App\Http\Controllers\Api\SupplierProfileController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AuthController::class, 'login']);
@@ -25,4 +28,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/bank-change-requests/{bankChangeRequest}', [BankChangeRequestController::class, 'show']);
     Route::post('/bank-change-requests/{bankChangeRequest}/approve', [BankChangeRequestController::class, 'approve']);
     Route::post('/bank-change-requests/{bankChangeRequest}/reject', [BankChangeRequestController::class, 'reject']);
+
+    Route::get('/supplier-profile', [SupplierProfileController::class, 'show']);
+    Route::post('/supplier-profile', [SupplierProfileController::class, 'store']);
+    Route::put('/supplier-profiles/{supplierProfile}', [SupplierProfileController::class, 'update']);
+    Route::patch('/supplier-profiles/{supplierProfile}', [SupplierProfileController::class, 'update']);
+    Route::get('/supplier-profiles/{supplierProfile}', [SupplierProfileController::class, 'showById']);
+
+    Route::get('/product-categories', [ProductCategoryController::class, 'index']);
+    Route::apiResource('products', ProductController::class);
 });

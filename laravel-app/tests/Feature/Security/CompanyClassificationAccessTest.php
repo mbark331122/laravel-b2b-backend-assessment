@@ -14,7 +14,7 @@ class CompanyClassificationAccessTest extends SecurityTestCase
 
         $this->assertTrue($supplierUser->isSupplierUser());
         $this->assertFalse($supplierUser->isBuyerUser());
-        $this->assertTrue($supplierUser->hasPermission('rfq.create'));
+        $this->assertFalse($supplierUser->hasPermission('rfq.create'));
 
         $this->actingAs($supplierUser, 'sanctum')
             ->postJson('/api/rfqs', $this->rfqPayload([
@@ -57,14 +57,14 @@ class CompanyClassificationAccessTest extends SecurityTestCase
 
         $this->actingAs($supplierUser, 'sanctum')
             ->getJson('/api/suppliers/'.$this->supplierA()->id.'/bank-account')
-            ->assertNotFound();
+            ->assertForbidden();
 
         $this->actingAs($supplierUser, 'sanctum')
             ->putJson('/api/rfqs/'.$rfq->id, $this->rfqPayload([
                 'destination' => 'Hijacked',
                 'company_id' => $supplierUser->company_id,
             ]))
-            ->assertNotFound();
+            ->assertForbidden();
 
         $this->assertSame('Jeddah', $rfq->fresh()->destination);
         $this->assertSame($this->userA()->company_id, $rfq->fresh()->company_id);

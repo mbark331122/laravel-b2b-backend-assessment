@@ -50,6 +50,11 @@ abstract class SecurityTestCase extends TestCase
         return User::query()->where('email', UserSeeder::SUPPLIER_USER_EMAIL)->firstOrFail();
     }
 
+    protected function supplierUserB(): User
+    {
+        return User::query()->where('email', UserSeeder::SUPPLIER_USER_B_EMAIL)->firstOrFail();
+    }
+
     protected function supplierA(): Supplier
     {
         return Supplier::query()->where('name', SupplierSeeder::SUPPLIER_A)->firstOrFail();

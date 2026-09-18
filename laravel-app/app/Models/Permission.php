@@ -23,6 +23,20 @@ class Permission extends Model
 
     public const BANK_APPROVE = 'bank.approve';
 
+    public const PRODUCT_READ = 'product.read';
+
+    public const PRODUCT_CREATE = 'product.create';
+
+    public const PRODUCT_UPDATE = 'product.update';
+
+    public const PRODUCT_DELETE = 'product.delete';
+
+    public const SUPPLIER_PROFILE_READ = 'supplier.profile.read';
+
+    public const SUPPLIER_PROFILE_CREATE = 'supplier.profile.create';
+
+    public const SUPPLIER_PROFILE_UPDATE = 'supplier.profile.update';
+
     /**
      * Platform permission catalog.
      *
@@ -41,11 +55,18 @@ class Permission extends Model
             self::BANK_READ,
             self::BANK_CHANGE_REQUEST,
             self::BANK_APPROVE,
+            self::PRODUCT_READ,
+            self::PRODUCT_CREATE,
+            self::PRODUCT_UPDATE,
+            self::PRODUCT_DELETE,
+            self::SUPPLIER_PROFILE_READ,
+            self::SUPPLIER_PROFILE_CREATE,
+            self::SUPPLIER_PROFILE_UPDATE,
         ];
     }
 
     /**
-     * Permissions granted to company users. Approval stays with admin.
+     * Permissions granted to buyer company users. Approval stays with admin.
      *
      * @return list<string>
      */
@@ -57,6 +78,27 @@ class Permission extends Model
             self::RFQ_UPDATE,
             self::BANK_READ,
             self::BANK_CHANGE_REQUEST,
+            self::PRODUCT_READ,
+            self::SUPPLIER_PROFILE_READ,
+        ];
+    }
+
+    /**
+     * Permissions granted to supplier company users.
+     *
+     * @return list<string>
+     */
+    public static function supplierUserNames(): array
+    {
+        return [
+            self::RFQ_READ,
+            self::PRODUCT_READ,
+            self::PRODUCT_CREATE,
+            self::PRODUCT_UPDATE,
+            self::PRODUCT_DELETE,
+            self::SUPPLIER_PROFILE_READ,
+            self::SUPPLIER_PROFILE_CREATE,
+            self::SUPPLIER_PROFILE_UPDATE,
         ];
     }
 

@@ -28,6 +28,16 @@ class AuditLog extends Model
 
     public const BANK_ACCOUNT_CHANGED = 'bank.account.changed';
 
+    public const SUPPLIER_PROFILE_CREATED = 'supplier.profile.created';
+
+    public const SUPPLIER_PROFILE_UPDATED = 'supplier.profile.updated';
+
+    public const PRODUCT_CREATED = 'product.created';
+
+    public const PRODUCT_UPDATED = 'product.updated';
+
+    public const PRODUCT_DELETED = 'product.deleted';
+
     /**
      * @var list<string>
      */

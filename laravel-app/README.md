@@ -1,6 +1,6 @@
 # Laravel Mini B2B Backend
 
-B2B procurement and supplier commerce API (multi-tenant). Current codebase includes RFQs, mocked AI extraction with human approval, supplier bank-change approval, and auditability — with a fixed sprint roadmap to complete the full commercial lifecycle.
+B2B procurement and supplier commerce API (multi-tenant). Current codebase includes identity/tenancy, supplier profiles, wholesale product catalog, RFQs, mocked AI extraction with human approval, supplier bank-change approval, and auditability — with a fixed sprint roadmap for the full commercial lifecycle.
 
 There is no frontend. The API is the product.
 
@@ -14,9 +14,11 @@ This is a single Laravel 13 API application.
 
 **Tenancy.** `Company` is the tenant. Companies are classified with `is_buyer` / `is_supplier` (set only by trusted backend/seeders — not client input). Company users have a `company_id`. Admin has no company and can operate across tenants when a permission allows it. Queries and policies scope company users to their own company. RFQ creation additionally requires a buyer company.
 
-**Authorization.** Roles (`admin`, `company_user`) own permissions. Policies enforce permission + tenant on every sensitive operation.
+**Authorization.** Roles (`admin`, `company_user`, `supplier_user`) own permissions. Policies enforce permission + tenant (and buyer/supplier classification) on every sensitive operation.
 
-**RFQ.** Official RFQ rows are the system of record. Company users can create, read, and update their own RFQs. They cannot approve AI proposals.
+**Catalog.** Supplier companies own a `SupplierProfile` and wholesale `Product` rows (MOQ, price, currency, category, active/inactive). Buyers may browse/view **active** products only. Product ownership always comes from the authenticated supplier company — never from client `company_id` / `supplier_id` / `tenant_id`.
+
+**RFQ.** Official RFQ rows are the system of record. Buyer company users can create, read, and update their own RFQs. They cannot approve AI proposals.
 
 **AI.** `MockAiExtractor` parses text only. It never receives or writes an RFQ. `AiExtractionService` stores an extraction and, when a field differs, a pending `RfqProposal`. Official RFQ fields change only in `RfqProposal::approve()`, using the stored proposed value.
 
@@ -56,10 +58,13 @@ Tests use an in-memory SQLite database (`phpunit.xml`). They do not need the fil
 | --- | --- | --- | --- | --- | --- |
 | User A | user.a@example.com | password | Company A | buyer | company_user |
 | User B | user.b@example.com | password | Company B | buyer | company_user |
-| Supplier User | supplier.user@example.com | password | Supplier Company | supplier | company_user |
+| Supplier User | supplier.user@example.com | password | Supplier Company | supplier | supplier_user |
+| Supplier User B | supplier.user.b@example.com | password | Supplier Company B | supplier | supplier_user |
 | Admin User | admin@example.com | password | none | none | admin |
 
-Seeded suppliers: Supplier A (Company A) and Supplier B (Company B), each with one active bank account. These are tenant-owned bank records for the existing banking workflow — not the Sprint 2 supplier catalog.
+Seeded bank records: Supplier A (Company A) and Supplier B (Company B), each with one active bank account (banking workflow — distinct from catalog `SupplierProfile`).
+
+Seeded catalog: categories Sugar/Grains; active + inactive products under Supplier Company; active product under Supplier Company B.
 
 ### Auth
 
@@ -72,7 +77,10 @@ Seeded suppliers: Supplier A (Company A) and Supplier B (Company B), each with o
 ```
 Company 1──* User
 Company 1──* Rfq
-Company 1──* Supplier
+Company 1──* Supplier                 # bank workflow record (buyer-tenant owned)
+Company 1──1 SupplierProfile          # catalog supplier identity (supplier-tenant)
+Company 1──* Product
+ProductCategory 1──* Product
 Role 1──* User
 Role *──* Permission
 
@@ -87,13 +95,16 @@ SupplierBankAccount 1──* BankAccountHistory
 AuditLog → actor (User), company (Company), auditable (morph)
 ```
 
-- **Companies** — tenants. Seeded: Company A, Company B.
-- **Users** — `company_id` nullable (admin is null). `role_id` required. `company_id` / `role_id` are not fillable.
-- **Roles / Permissions** — `admin` has all permissions. `company_user` has operational RFQ/bank permissions, not `rfq.approve` or `bank.approve`.
+- **Companies** — tenants with buyer/supplier classification (`is_buyer`, `is_supplier`). Seeded: Company A/B (buyer), Supplier Company / Supplier Company B (supplier).
+- **Users** — `company_id` nullable (admin is null). `role_id` required. `company_id` / `role_id` are not fillable. Classification is read from the user's company.
+- **Roles / Permissions** — `admin` has all permissions. `company_user` has buyer operational RFQ/bank permissions plus `product.read` / `supplier.profile.read` (not approve, not product mutate). `supplier_user` has catalog mutate permissions plus `rfq.read`.
+- **Supplier Profiles** — one profile per supplier company (`display_name`, description, contact, status).
+- **Product Categories** — platform-level categories (`name`, status).
+- **Products** — wholesale catalog owned by supplier `company_id` + `supplier_profile_id`: name, sku, description, category, unit, MOQ, wholesale_price, currency, status (`active`/`inactive`).
 - **RFQs** — official commodity, specification, quantity, unit, incoterm, destination, status (`draft`), `company_id`.
 - **AI Extractions** — proposed fields, confidence, source (`AI/mock`), status. Belongs to an RFQ. Does not replace the official RFQ.
 - **RFQ Proposals** — field-level conflict: current value, proposed value, source, confidence, status (`pending` / `approved` / `rejected`).
-- **Suppliers** — minimal tenant-owned record for bank data.
+- **Suppliers** — minimal tenant-owned record for bank data (not the catalog profile).
 - **Supplier Bank Accounts** — official beneficiary, bank name, IBAN, status (`active`). IBAN is not fillable.
 - **Bank Change Requests** — current IBAN, proposed IBAN, requester, company (copied from supplier), status.
 - **Bank Account History** — snapshot of the official account taken on approval, before the IBAN is overwritten.
@@ -185,6 +196,16 @@ All routes below except login require `auth:sanctum`.
 | `GET` | `/api/bank-change-requests/{id}` | `bank.read` |
 | `POST` | `/api/bank-change-requests/{id}/approve` | `bank.approve` |
 | `POST` | `/api/bank-change-requests/{id}/reject` | `bank.approve` |
+| `GET` | `/api/supplier-profile` | `supplier.profile.read` (own) |
+| `POST` | `/api/supplier-profile` | `supplier.profile.create` |
+| `GET` | `/api/supplier-profiles/{id}` | `supplier.profile.read` |
+| `PUT/PATCH` | `/api/supplier-profiles/{id}` | `supplier.profile.update` |
+| `GET` | `/api/product-categories` | `product.read` |
+| `GET` | `/api/products` | `product.read` |
+| `POST` | `/api/products` | `product.create` |
+| `GET` | `/api/products/{product}` | `product.read` |
+| `PUT/PATCH` | `/api/products/{product}` | `product.update` |
+| `DELETE` | `/api/products/{product}` | `product.delete` |
 
 ## Testing
 
@@ -192,7 +213,7 @@ All routes below except login require `auth:sanctum`.
 php artisan test
 ```
 
-Latest full run: **90 tests**, **379 assertions**, **0 failures**, **0 errors**, **0 skipped**.
+Latest full run: **127 tests**, **556 assertions**, **0 failures**, **0 errors**, **0 skipped**.
 
 Coverage includes:
 

@@ -69,7 +69,7 @@ class CompanyClassificationTest extends TestCase
 
         $this->assertFalse($supplier->isBuyerUser());
         $this->assertTrue($supplier->isSupplierUser());
-        $this->assertTrue($supplier->hasRole(Role::COMPANY_USER));
+        $this->assertTrue($supplier->hasRole(\App\Models\Role::SUPPLIER_USER));
         $this->assertSame(CompanySeeder::SUPPLIER_COMPANY, $supplier->company->name);
 
         $this->assertFalse($admin->isBuyerUser());

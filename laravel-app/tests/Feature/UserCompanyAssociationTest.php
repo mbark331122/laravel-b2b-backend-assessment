@@ -57,7 +57,8 @@ class UserCompanyAssociationTest extends TestCase
         $this->assertTrue($user->isSupplierUser());
         $this->assertFalse($user->isBuyerUser());
         $this->assertFalse($user->isAdmin());
-        $this->assertTrue($user->hasRole(Role::COMPANY_USER));
+        $this->assertTrue($user->hasRole(Role::SUPPLIER_USER));
+        $this->assertFalse($user->hasRole(Role::COMPANY_USER));
     }
 
     public function test_admin_user_is_not_tied_to_a_company(): void
