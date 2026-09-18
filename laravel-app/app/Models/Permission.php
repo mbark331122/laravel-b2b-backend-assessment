@@ -17,6 +17,14 @@ class Permission extends Model
 
     public const RFQ_APPROVE = 'rfq.approve';
 
+    public const RFQ_DELETE = 'rfq.delete';
+
+    public const RFQ_SUBMIT = 'rfq.submit';
+
+    public const RFQ_CANCEL = 'rfq.cancel';
+
+    public const RFQ_CLOSE = 'rfq.close';
+
     public const BANK_READ = 'bank.read';
 
     public const BANK_CHANGE_REQUEST = 'bank.change_request';
@@ -56,6 +64,10 @@ class Permission extends Model
             self::RFQ_CREATE,
             self::RFQ_UPDATE,
             self::RFQ_APPROVE,
+            self::RFQ_DELETE,
+            self::RFQ_SUBMIT,
+            self::RFQ_CANCEL,
+            self::RFQ_CLOSE,
             self::BANK_READ,
             self::BANK_CHANGE_REQUEST,
             self::BANK_APPROVE,
@@ -82,6 +94,10 @@ class Permission extends Model
             self::RFQ_READ,
             self::RFQ_CREATE,
             self::RFQ_UPDATE,
+            self::RFQ_DELETE,
+            self::RFQ_SUBMIT,
+            self::RFQ_CANCEL,
+            self::RFQ_CLOSE,
             self::BANK_READ,
             self::BANK_CHANGE_REQUEST,
             self::PRODUCT_READ,
@@ -91,13 +107,13 @@ class Permission extends Model
 
     /**
      * Permissions granted to supplier company users.
+     * Suppliers intentionally do not receive RFQ create/update/lifecycle permissions.
      *
      * @return list<string>
      */
     public static function supplierUserNames(): array
     {
         return [
-            self::RFQ_READ,
             self::PRODUCT_READ,
             self::PRODUCT_CREATE,
             self::PRODUCT_UPDATE,

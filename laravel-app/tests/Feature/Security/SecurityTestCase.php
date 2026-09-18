@@ -71,6 +71,7 @@ abstract class SecurityTestCase extends TestCase
     protected function createOfficialRfq(Company $company, array $overrides = []): Rfq
     {
         return $company->rfqs()->create([
+            'title' => 'Official RFQ',
             'commodity' => 'Sugar',
             'specification' => 'ICUMSA 45',
             'quantity' => 25000,

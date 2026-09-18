@@ -53,7 +53,7 @@ class CompanyClassificationAccessTest extends SecurityTestCase
 
         $this->actingAs($supplierUser, 'sanctum')
             ->getJson('/api/rfqs/'.$rfq->id)
-            ->assertNotFound();
+            ->assertForbidden();
 
         $this->actingAs($supplierUser, 'sanctum')
             ->getJson('/api/suppliers/'.$this->supplierA()->id.'/bank-account')
@@ -70,15 +70,14 @@ class CompanyClassificationAccessTest extends SecurityTestCase
         $this->assertSame($this->userA()->company_id, $rfq->fresh()->company_id);
     }
 
-    public function test_supplier_company_user_rfq_list_stays_empty_and_ignores_company_id_query(): void
+    public function test_supplier_company_user_cannot_list_buyer_rfqs(): void
     {
         $this->createOfficialRfq($this->userA()->company);
         $this->createOfficialRfq($this->userB()->company);
 
         $this->actingAs($this->supplierUser(), 'sanctum')
             ->getJson('/api/rfqs?company_id='.$this->userA()->company_id)
-            ->assertOk()
-            ->assertJsonCount(0, 'rfqs');
+            ->assertForbidden();
     }
 
     public function test_audit_foundation_uses_authenticated_actor_and_resource_company(): void

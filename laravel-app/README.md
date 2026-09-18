@@ -18,7 +18,7 @@ This is a single Laravel 13 API application.
 
 **Catalog.** Supplier companies own a `SupplierProfile` and wholesale `Product` rows (brand, specs, MOQ/max/increment, base price + tiers, lifecycle). Buyers may browse/view **published** products only. New supplier products start as `draft` and require lifecycle review before publication. Product ownership always comes from the authenticated supplier company — never from client `company_id` / `supplier_id` / `tenant_id`.
 
-**RFQ.** Official RFQ rows are the system of record. Buyer company users can create, read, and update their own RFQs. They cannot approve AI proposals.
+**RFQ.** Official RFQ rows are the system of record for buyer demand. Buyer companies create draft RFQs (legacy commodity fields remain supported for AI enrichment), attach line items with optional published-product snapshots, then submit/cancel/close through controlled transitions. Submitted RFQs are immutable via normal update/item endpoints. Suppliers have no RFQ inbox in this sprint.
 
 **AI.** `MockAiExtractor` parses text only. It never receives or writes an RFQ. `AiExtractionService` stores an extraction and, when a field differs, a pending `RfqProposal`. Official RFQ fields change only in `RfqProposal::approve()`, using the stored proposed value.
 
@@ -100,12 +100,13 @@ AuditLog → actor (User), company (Company), auditable (morph)
 
 - **Companies** — tenants with buyer/supplier classification (`is_buyer`, `is_supplier`). Seeded: Company A/B (buyer), Supplier Company / Supplier Company B (supplier).
 - **Users** — `company_id` nullable (admin is null). `role_id` required. `company_id` / `role_id` are not fillable. Classification is read from the user's company.
-- **Roles / Permissions** — `admin` has all permissions. `company_user` has buyer operational RFQ/bank permissions plus `product.read` / `supplier.profile.read` (not approve, not product mutate). `supplier_user` has catalog mutate permissions plus `rfq.read`. Platform-only: `brand.create`, `product.review`.
+- **Roles / Permissions** — `admin` has all permissions. `company_user` has buyer RFQ/bank/catalog-read permissions including `rfq.submit` / `rfq.cancel` / `rfq.close` / `rfq.delete` (not `rfq.approve` or bank approve). `supplier_user` has catalog mutate permissions only (no RFQ access). Platform-only: `brand.create`, `product.review`.
 - **Supplier Profiles** — one profile per supplier company (`display_name`, description, contact, status). Buyer discovery via `GET /api/supplier-profiles`.
 - **Brands** — platform-level (`name`, `slug`, status). Readable with `product.read`; create requires `brand.create`.
 - **Product Categories** — platform-level categories (`name`, status).
 - **Products** — wholesale catalog owned by supplier `company_id` + `supplier_profile_id`: name, sku, description, category, brand, unit, MOQ, maximum_order_quantity, quantity_increment, wholesale_price, currency, lifecycle status (`draft` / `pending_review` / `approved` / `published` / `rejected` / `archived`). Nested specs + price tiers. Buyers see `published` only.
-- **RFQs** — official commodity, specification, quantity, unit, incoterm, destination, status (`draft`), `company_id`.
+- **RFQs** — buyer-owned demand records: title/description, legacy commodity fields (AI), destination/incoterm/currency/required_by_date, lifecycle (`draft` / `submitted` / `cancelled` / `closed`), `company_id`.
+- **RFQ Items** — line items with quantity/unit, optional target price, optional published `product_id` + immutable `product_snapshot` JSON.
 - **AI Extractions** — proposed fields, confidence, source (`AI/mock`), status. Belongs to an RFQ. Does not replace the official RFQ.
 - **RFQ Proposals** — field-level conflict: current value, proposed value, source, confidence, status (`pending` / `approved` / `rejected`).
 - **Suppliers** — minimal tenant-owned record for bank data (not the catalog profile).
@@ -187,10 +188,17 @@ All routes below except login require `auth:sanctum`.
 | `POST` | `/api/login` | public |
 | `GET` | `/api/me` | authenticated |
 | `POST` | `/api/logout` | authenticated |
-| `GET` | `/api/rfqs` | `rfq.read` |
-| `POST` | `/api/rfqs` | `rfq.create` |
+| `GET` | `/api/rfqs` | `rfq.read` (filters: status, created/updated dates) |
+| `POST` | `/api/rfqs` | `rfq.create` (always `draft`; ownership from auth company) |
 | `GET` | `/api/rfqs/{rfq}` | `rfq.read` |
-| `PUT/PATCH` | `/api/rfqs/{rfq}` | `rfq.update` |
+| `PUT/PATCH` | `/api/rfqs/{rfq}` | `rfq.update` (draft only) |
+| `DELETE` | `/api/rfqs/{rfq}` | `rfq.delete` (draft only) |
+| `POST` | `/api/rfqs/{rfq}/submit` | `rfq.submit` |
+| `POST` | `/api/rfqs/{rfq}/cancel` | `rfq.cancel` |
+| `POST` | `/api/rfqs/{rfq}/close` | `rfq.close` |
+| `POST` | `/api/rfqs/{rfq}/items` | `rfq.update` (draft) |
+| `PUT/PATCH` | `/api/rfqs/{rfq}/items/{item}` | `rfq.update` (draft) |
+| `DELETE` | `/api/rfqs/{rfq}/items/{item}` | `rfq.update` (draft) |
 | `GET` | `/api/rfqs/{rfq}/extractions` | `rfq.read` |
 | `POST` | `/api/rfqs/{rfq}/extractions` | `rfq.read` |
 | `POST` | `/api/proposals/{proposal}/approve` | `rfq.approve` |
@@ -223,7 +231,7 @@ All routes below except login require `auth:sanctum`.
 php artisan test
 ```
 
-Latest full run: **136 tests**, **634 assertions**, **0 failures**, **0 errors**, **0 skipped**.
+Latest full run: **145 tests**, **692 assertions**, **0 failures**, **0 errors**, **0 skipped**.
 
 Coverage includes:
 

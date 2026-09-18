@@ -71,7 +71,7 @@ class RolePermissionTest extends TestCase
         );
 
         $this->assertTrue($role->permissions->contains('name', Permission::PRODUCT_CREATE));
-        $this->assertTrue($role->permissions->contains('name', Permission::RFQ_READ));
+        $this->assertFalse($role->permissions->contains('name', Permission::RFQ_READ));
         $this->assertFalse($role->permissions->contains('name', Permission::RFQ_CREATE));
     }
 

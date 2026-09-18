@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProductPriceTierController;
 use App\Http\Controllers\Api\ProductSpecificationController;
 use App\Http\Controllers\Api\RfqController;
+use App\Http\Controllers\Api\RfqItemController;
 use App\Http\Controllers\Api\RfqProposalController;
 use App\Http\Controllers\Api\SupplierBankAccountController;
 use App\Http\Controllers\Api\SupplierProfileController;
@@ -20,7 +21,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    Route::apiResource('rfqs', RfqController::class)->except(['destroy']);
+    Route::apiResource('rfqs', RfqController::class);
+    Route::post('/rfqs/{rfq}/submit', [RfqController::class, 'submit']);
+    Route::post('/rfqs/{rfq}/cancel', [RfqController::class, 'cancel']);
+    Route::post('/rfqs/{rfq}/close', [RfqController::class, 'close']);
+    Route::post('/rfqs/{rfq}/items', [RfqItemController::class, 'store']);
+    Route::put('/rfqs/{rfq}/items/{item}', [RfqItemController::class, 'update']);
+    Route::patch('/rfqs/{rfq}/items/{item}', [RfqItemController::class, 'update']);
+    Route::delete('/rfqs/{rfq}/items/{item}', [RfqItemController::class, 'destroy']);
     Route::get('/rfqs/{rfq}/extractions', [AiExtractionController::class, 'index']);
     Route::post('/rfqs/{rfq}/extractions', [AiExtractionController::class, 'store']);
     Route::post('/proposals/{proposal}/approve', [RfqProposalController::class, 'approve']);
