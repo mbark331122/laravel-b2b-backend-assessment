@@ -125,6 +125,18 @@ class Permission extends Model
 
     public const RMA_CLOSE = 'rma.close';
 
+    public const RETURN_SHIPMENT_READ = 'return_shipment.read';
+
+    public const RETURN_SHIPMENT_CREATE = 'return_shipment.create';
+
+    public const RETURN_SHIPMENT_UPDATE = 'return_shipment.update';
+
+    public const RETURN_SHIPMENT_CANCEL = 'return_shipment.cancel';
+
+    public const RETURN_SHIPMENT_SHIP = 'return_shipment.ship';
+
+    public const RETURN_SHIPMENT_DELIVER = 'return_shipment.deliver';
+
     public const BANK_READ = 'bank.read';
 
     public const BANK_CHANGE_REQUEST = 'bank.change_request';
@@ -218,6 +230,12 @@ class Permission extends Model
             self::RMA_REJECT,
             self::RMA_RECEIVE,
             self::RMA_CLOSE,
+            self::RETURN_SHIPMENT_READ,
+            self::RETURN_SHIPMENT_CREATE,
+            self::RETURN_SHIPMENT_UPDATE,
+            self::RETURN_SHIPMENT_CANCEL,
+            self::RETURN_SHIPMENT_SHIP,
+            self::RETURN_SHIPMENT_DELIVER,
             self::BANK_READ,
             self::BANK_CHANGE_REQUEST,
             self::BANK_APPROVE,
@@ -274,6 +292,10 @@ class Permission extends Model
             self::RMA_READ,
             self::RMA_CREATE,
             self::RMA_CANCEL,
+            self::RETURN_SHIPMENT_READ,
+            self::RETURN_SHIPMENT_CREATE,
+            self::RETURN_SHIPMENT_UPDATE,
+            self::RETURN_SHIPMENT_CANCEL,
             self::BANK_READ,
             self::BANK_CHANGE_REQUEST,
             self::PRODUCT_READ,
@@ -335,6 +357,9 @@ class Permission extends Model
             self::RMA_REJECT,
             self::RMA_RECEIVE,
             self::RMA_CLOSE,
+            self::RETURN_SHIPMENT_READ,
+            self::RETURN_SHIPMENT_SHIP,
+            self::RETURN_SHIPMENT_DELIVER,
         ];
     }
 

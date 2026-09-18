@@ -1,6 +1,6 @@
 # Laravel Mini B2B Backend
 
-B2B procurement and supplier commerce API (multi-tenant). Current codebase includes identity/tenancy, supplier profiles, wholesale product catalog, RFQs, supplier matching & distribution, quotations, negotiation with immutable counter-offers, purchase orders with supplier confirmation, commercial invoices (snapshotted from confirmed POs), payment foundation (manual lifecycle, no gateway), shipping & fulfillment foundation (one shipment per confirmed PO, no carrier APIs), buyer delivery confirmation (immutable receipt acknowledgment), returns/RMA foundation (buyer request + supplier review; no refunds), mocked AI extraction with human approval, supplier bank-change approval, and auditability — with a fixed sprint roadmap for the full commercial lifecycle.
+B2B procurement and supplier commerce API (multi-tenant). Current codebase includes identity/tenancy, supplier profiles, wholesale product catalog, RFQs, supplier matching & distribution, quotations, negotiation with immutable counter-offers, purchase orders with supplier confirmation, commercial invoices (snapshotted from confirmed POs), payment foundation (manual lifecycle, no gateway), shipping & fulfillment foundation (one shipment per confirmed PO, no carrier APIs), buyer delivery confirmation (immutable receipt acknowledgment), returns/RMA foundation (buyer request + supplier review; no refunds), RMA return logistics (return shipments for approved RMAs; no carrier APIs), mocked AI extraction with human approval, supplier bank-change approval, and auditability — with a fixed sprint roadmap for the full commercial lifecycle.
 
 There is no frontend. The API is the product.
 
@@ -36,7 +36,9 @@ This is a single Laravel 13 API application.
 
 **Delivery Confirmation.** Buyers confirm receipt only for a **delivered** shipment (`POST /api/shipments/{shipment}/delivery-confirmation`). One confirmation per shipment (unique `shipment_id`); idempotent re-create returns the existing confirmation. Server-generated unique `number` (`DEL-{YEAR}-{id}`). Status is always `confirmed` and immutable (no update/delete/cancel). Does **not** auto-complete the PO, mark the invoice paid, create a payment, or create another shipment. Independent of payment status. Supplier may read related confirmations only. **No returns, RMA, disputes, refunds, ratings, or escrow.**
 
-**Returns / RMA.** Buyers create an RMA only for a **delivered** shipment that already has a delivery confirmation (`POST /api/shipments/{shipment}/rma`). One **active** RMA per shipment (`active_lock`); a new RMA may be created only after the previous reaches `rejected` / `cancelled` / `closed`. Server-generated unique `number` (`RMA-{YEAR}-{id}`). Items snapshot shipment lines; return qty must be > 0 and ≤ shipped qty. Lifecycle: `requested` → `approved`|`rejected`|`cancelled`; `approved` → `received` → `closed`. Buyer cancels while requested; supplier approves/rejects/receives/closes. Does **not** refund payments, create credit notes, modify invoices/payments, change inventory, or create return shipments.
+**Returns / RMA.** Buyers create an RMA only for a **delivered** shipment that already has a delivery confirmation (`POST /api/shipments/{shipment}/rma`). One **active** RMA per shipment (`active_lock`); a new RMA may be created only after the previous reaches `rejected` / `cancelled` / `closed`. Server-generated unique `number` (`RMA-{YEAR}-{id}`). Items snapshot shipment lines; return qty must be > 0 and ≤ shipped qty. Lifecycle: `requested` → `approved`|`rejected`|`cancelled`; `approved` → `received` → `closed`. Buyer cancels while requested; supplier approves/rejects/receives/closes. Does **not** refund payments, create credit notes, modify invoices/payments, change inventory, or create return shipments automatically.
+
+**RMA Return Logistics.** Buyers create a return shipment only for an **approved** RMA (`POST /api/rmas/{rma}/return-shipment`). One **active** return shipment per RMA (`active_lock`). Server-generated unique `number` (`RMA-RET-{YEAR}-{id}`). Items must belong to the RMA; qty ≤ RMA item qty; price snapshots from original shipment lines. Origin = buyer return address; destination = supplier. Lifecycle: `pending` → `shipped` → `delivered`, or `pending`/`shipped` → `cancelled`. Buyer updates logistics while pending and may cancel; supplier marks shipped/delivered. Does **not** auto-mark RMA received/closed, refund, or change inventory. **No carrier APIs or tracking webhooks.**
 
 **AI.** `MockAiExtractor` parses text only. It never receives or writes an RFQ. `AiExtractionService` stores an extraction and, when a field differs, a pending `RfqProposal`. Official RFQ fields change only in `RfqProposal::approve()`, using the stored proposed value.
 
@@ -125,6 +127,8 @@ Shipment 1──* ShipmentItem
 Shipment 1──1 DeliveryConfirmation
 Shipment 1──* Rma
 Rma 1──* RmaItem
+Rma 1──* ReturnShipment
+ReturnShipment 1──* ReturnShipmentItem
 AiExtraction 1──* RfqProposal
 
 Supplier 1──1 SupplierBankAccount
@@ -136,7 +140,7 @@ AuditLog → actor (User), company (Company), auditable (morph)
 
 - **Companies** — tenants with buyer/supplier classification (`is_buyer`, `is_supplier`). Seeded: Company A/B (buyer), Supplier Company / Supplier Company B (supplier).
 - **Users** — `company_id` nullable (admin is null). `role_id` required. `company_id` / `role_id` are not fillable. Classification is read from the user's company.
-- **Roles / Permissions** — `admin` has all permissions. `company_user` has buyer RFQ/quotation/negotiation permissions plus `purchase_order.read|create|submit|cancel|complete`, `invoice.read`, `payment.read|create|cancel`, `shipment.read`, `delivery_confirmation.read|create`, and `rma.read|create|cancel`. `supplier_user` has catalog/quotation/negotiation permissions plus `purchase_order.read|confirm|reject`, `invoice.read|create|issue|cancel|void`, `payment.read|mark_paid|mark_failed`, `shipment.read|create|update|process|ship|deliver|cancel`, `delivery_confirmation.read`, and `rma.read|approve|reject|receive|close`. Platform-only: `brand.create`, `product.review`.
+- **Roles / Permissions** — `admin` has all permissions. `company_user` has buyer RFQ/quotation/negotiation permissions plus `purchase_order.read|create|submit|cancel|complete`, `invoice.read`, `payment.read|create|cancel`, `shipment.read`, `delivery_confirmation.read|create`, `rma.read|create|cancel`, and `return_shipment.read|create|update|cancel`. `supplier_user` has catalog/quotation/negotiation permissions plus `purchase_order.read|confirm|reject`, `invoice.read|create|issue|cancel|void`, `payment.read|mark_paid|mark_failed`, `shipment.read|create|update|process|ship|deliver|cancel`, `delivery_confirmation.read`, `rma.read|approve|reject|receive|close`, and `return_shipment.read|ship|deliver`. Platform-only: `brand.create`, `product.review`.
 - **Supplier Profiles** — one profile per supplier company (`display_name`, description, contact, status). Buyer discovery via `GET /api/supplier-profiles` returns only eligible suppliers (`status=active` + `company.is_supplier=true`), filterable by `q`, `product_category_id`, `brand_id`, `product_q`.
 - **Brands** — platform-level (`name`, `slug`, status). Readable with `product.read`; create requires `brand.create`.
 - **Product Categories** — platform-level categories (`name`, status).
@@ -159,6 +163,8 @@ AuditLog → actor (User), company (Company), auditable (morph)
 - **Delivery Confirmations** — one per delivered shipment; unique `number`; buyer-created immutable `confirmed` record; does not mutate PO/invoice/payment.
 - **RMAs** — buyer-created against delivered+confirmed shipments; unique `number`; one active RMA per shipment; lifecycle `requested` / `approved` / `rejected` / `received` / `closed` / `cancelled`.
 - **RMA Items** — immutable snapshots from shipment items with validated return quantities.
+- **Return Shipments** — buyer-created logistics for approved RMAs; unique `number`; one active per RMA; lifecycle `pending` / `shipped` / `delivered` / `cancelled`.
+- **Return Shipment Items** — immutable snapshots from RMA/shipment items with validated quantities and price snapshots.
 - **AI Extractions** — proposed fields, confidence, source (`AI/mock`), status. Belongs to an RFQ. Does not replace the official RFQ.
 - **RFQ Proposals** — field-level conflict: current value, proposed value, source, confidence, status (`pending` / `approved` / `rejected`).
 - **Suppliers** — minimal tenant-owned record for bank data (not the catalog profile).
@@ -186,6 +192,7 @@ Tenant context is never taken from a client `company_id`.
 - Shipment relationships and line items are derived from the confirmed PO. Client ownership IDs / `number` / status / item qty/prices are ignored. Suppliers create and transition; buyers read only. Address snapshots are historical shipping data, not ownership.
 - Delivery confirmation relationships and confirming user are derived from the delivered shipment and authenticated buyer. Client ownership IDs / `number` / status / `confirmed_at` are ignored. Immutable after create.
 - RMA relationships and items are derived from the delivered shipment + delivery confirmation. Client ownership IDs / `number` / status / product IDs are ignored. Buyer creates/cancels; supplier reviews. Does not mutate shipment/PO/invoice/payment.
+- Return shipment relationships and items are derived from the approved RMA. Client ownership IDs / `number` / status are ignored. Buyer creates/updates/cancels; supplier ships/delivers. Does not auto-change RMA/invoice/payment.
 
 ## AI Safety
 
@@ -243,6 +250,7 @@ Important mutations are logged. Reads are not.
 | `shipment.created` / `updated` / `processing` / `shipped` / `delivered` / `cancelled` | Shipment lifecycle |
 | `delivery_confirmation.created` | Buyer confirms delivered shipment receipt |
 | `rma.created` / `cancelled` / `approved` / `rejected` / `received` / `closed` | RMA lifecycle |
+| `return_shipment.created` / `updated` / `shipped` / `delivered` / `cancelled` | Return shipment lifecycle |
 | `rfq.approved` | Official RFQ changed by proposal approval |
 | `proposal.created` | A conflicting proposal is stored |
 | `proposal.approved` / `proposal.rejected` | Proposal resolved |
@@ -361,6 +369,14 @@ All routes below except login require `auth:sanctum`.
 | `GET` | `/api/rmas` | `rma.read` (buyer company) |
 | `GET` | `/api/rmas/{rma}` | `rma.read` |
 | `POST` | `/api/rmas/{rma}/cancel` | `rma.cancel` (requested only) |
+| `POST` | `/api/rmas/{rma}/return-shipment` | `return_shipment.create` (approved RMA; buyer; idempotent active) |
+| `GET` | `/api/rmas/{rma}/return-shipment` | `return_shipment.read` |
+| `GET` | `/api/return-shipments` | `return_shipment.read` (buyer company) |
+| `GET` | `/api/return-shipments/{returnShipment}` | `return_shipment.read` |
+| `PATCH` | `/api/return-shipments/{returnShipment}` | `return_shipment.update` (pending only) |
+| `POST` | `/api/return-shipments/{returnShipment}/ship` | `return_shipment.ship` |
+| `POST` | `/api/return-shipments/{returnShipment}/deliver` | `return_shipment.deliver` |
+| `POST` | `/api/return-shipments/{returnShipment}/cancel` | `return_shipment.cancel` |
 | `GET` | `/api/supplier/invoices` | `invoice.read` (supplier company invoices) |
 | `GET` | `/api/supplier/invoices/{invoice}` | `invoice.read` |
 | `GET` | `/api/supplier/payments` | `payment.read` (supplier company payments) |
@@ -375,6 +391,8 @@ All routes below except login require `auth:sanctum`.
 | `POST` | `/api/supplier/rmas/{rma}/reject` | `rma.reject` (requires `rejection_reason`) |
 | `POST` | `/api/supplier/rmas/{rma}/received` | `rma.receive` |
 | `POST` | `/api/supplier/rmas/{rma}/close` | `rma.close` |
+| `GET` | `/api/supplier/return-shipments` | `return_shipment.read` (supplier company) |
+| `GET` | `/api/supplier/return-shipments/{returnShipment}` | `return_shipment.read` |
 | `GET` | `/api/product-categories` | `product.read` |
 | `GET` | `/api/brands` | `product.read` |
 | `POST` | `/api/brands` | `brand.create` |
@@ -393,7 +411,7 @@ All routes below except login require `auth:sanctum`.
 php artisan test
 ```
 
-Latest full run: **222 tests**, **2103 assertions**, **0 failures**, **0 errors**, **0 skipped**.
+Latest full run: **pending verification after Sprint 14**.
 
 Coverage includes:
 
@@ -417,10 +435,12 @@ Coverage includes:
 - Delivery confirmation immutability and payment/PO independence
 - RMA creation after delivery confirmation; supplier review lifecycle
 - RMA quantity validation and active-RMA uniqueness
+- Return shipment for approved RMA; ship/deliver/cancel lifecycle
+- Return shipment item quantity and ownership validation
 - Cross-company isolation and spoofing defenses
 - AI extraction / proposals / bank change / audit trails
 
-**Not implemented:** payment gateways, refunds, credit notes, invoice/payment mutation from RMA, carrier APIs, return shipments, reverse logistics, warehouses, inventory, packages, split/partial shipments, disputes, ratings/reviews, escrow, ZATCA / e-invoicing, VAT/tax calculation engines, B2C checkout.
+**Not implemented:** payment gateways, refunds, credit notes, invoice/payment mutation from RMA/return shipment, carrier APIs, tracking webhooks, warehouses, inventory, packages, split/partial shipments, disputes, ratings/reviews, escrow, replacement/exchange orders, ZATCA / e-invoicing, VAT/tax calculation engines, B2C checkout.
 
 ## AI / Cursor Usage
 
@@ -461,6 +481,7 @@ Business rules were validated by those tests and by reading the write paths (`Mo
 - Shipments require a confirmed purchase order (independent of payment state). One shipment per PO. Supplier creates/updates/transitions; buyer reads. No carrier integrations or inventory.
 - Delivery confirmations require a delivered shipment. Buyer creates; supplier reads. One confirmation per shipment. Does not complete the PO or change invoice/payment state. No disputes or ratings.
 - RMAs require a delivered shipment with delivery confirmation. Buyer creates/cancels; supplier approves/rejects/receives/closes. One active RMA per shipment. Does not refund, adjust invoices, or modify inventory.
+- Return shipments require an approved RMA. Buyer creates/updates/cancels; supplier ships/delivers. One active return shipment per RMA. Does not auto-change RMA received/closed or financial records.
 - The mock extractor targets text like `Need 25,000 MT ICUMSA 45 Sugar, CIF Jeddah.`
 - Extraction confidence is `0.9`; source is `AI/mock`.
 - Proposals are created per differing field.

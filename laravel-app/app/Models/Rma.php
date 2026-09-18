@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use InvalidArgumentException;
 
 #[Fillable([])]
@@ -175,6 +176,24 @@ class Rma extends Model
     public function items(): HasMany
     {
         return $this->hasMany(RmaItem::class)->orderBy('sort_order')->orderBy('id');
+    }
+
+    /**
+     * @return HasMany<ReturnShipment, $this>
+     */
+    public function returnShipments(): HasMany
+    {
+        return $this->hasMany(ReturnShipment::class)->orderByDesc('id');
+    }
+
+    /**
+     * Latest return shipment for this RMA when present.
+     *
+     * @return HasOne<ReturnShipment, $this>
+     */
+    public function returnShipment(): HasOne
+    {
+        return $this->hasOne(ReturnShipment::class)->latestOfMany();
     }
 
     public function isActive(): bool

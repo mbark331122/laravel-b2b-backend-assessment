@@ -114,6 +114,16 @@ class AuditLog extends Model
 
     public const RMA_CLOSED = 'rma.closed';
 
+    public const RETURN_SHIPMENT_CREATED = 'return_shipment.created';
+
+    public const RETURN_SHIPMENT_UPDATED = 'return_shipment.updated';
+
+    public const RETURN_SHIPMENT_SHIPPED = 'return_shipment.shipped';
+
+    public const RETURN_SHIPMENT_DELIVERED = 'return_shipment.delivered';
+
+    public const RETURN_SHIPMENT_CANCELLED = 'return_shipment.cancelled';
+
     public const RFQ_APPROVED = 'rfq.approved';
 
     public const PROPOSAL_CREATED = 'proposal.created';

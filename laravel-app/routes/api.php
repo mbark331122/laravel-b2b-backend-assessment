@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProductPriceTierController;
 use App\Http\Controllers\Api\ProductSpecificationController;
 use App\Http\Controllers\Api\PurchaseOrderController;
+use App\Http\Controllers\Api\ReturnShipmentController;
 use App\Http\Controllers\Api\RfqController;
 use App\Http\Controllers\Api\RfqDistributionController;
 use App\Http\Controllers\Api\RfqItemController;
@@ -129,6 +130,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/rmas', [RmaController::class, 'index']);
     Route::get('/rmas/{rma}', [RmaController::class, 'show']);
     Route::post('/rmas/{rma}/cancel', [RmaController::class, 'cancel']);
+    Route::post('/rmas/{rma}/return-shipment', [ReturnShipmentController::class, 'store']);
+    Route::get('/rmas/{rma}/return-shipment', [ReturnShipmentController::class, 'showForRma']);
+
+    Route::get('/return-shipments', [ReturnShipmentController::class, 'index']);
+    Route::get('/return-shipments/{returnShipment}', [ReturnShipmentController::class, 'show']);
+    Route::patch('/return-shipments/{returnShipment}', [ReturnShipmentController::class, 'update']);
+    Route::post('/return-shipments/{returnShipment}/ship', [ReturnShipmentController::class, 'ship']);
+    Route::post('/return-shipments/{returnShipment}/deliver', [ReturnShipmentController::class, 'deliver']);
+    Route::post('/return-shipments/{returnShipment}/cancel', [ReturnShipmentController::class, 'cancel']);
 
     Route::get('/supplier/negotiations', [NegotiationController::class, 'indexForSupplier']);
     Route::get('/supplier/negotiations/{negotiation}', [NegotiationController::class, 'show']);
@@ -157,6 +167,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/supplier/rmas/{rma}/reject', [RmaController::class, 'reject']);
     Route::post('/supplier/rmas/{rma}/received', [RmaController::class, 'received']);
     Route::post('/supplier/rmas/{rma}/close', [RmaController::class, 'close']);
+
+    Route::get('/supplier/return-shipments', [ReturnShipmentController::class, 'indexForSupplier']);
+    Route::get('/supplier/return-shipments/{returnShipment}', [ReturnShipmentController::class, 'show']);
 
     Route::get('/product-categories', [ProductCategoryController::class, 'index']);
     Route::get('/brands', [BrandController::class, 'index']);
