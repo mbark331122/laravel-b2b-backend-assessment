@@ -131,6 +131,10 @@ Shipment 1──* Rma
 Rma 1──* RmaItem
 Rma 1──* ReturnShipment
 ReturnShipment 1──* ReturnShipmentItem
+Rma 1──1 CreditNote
+CreditNote 1──* CreditNoteItem
+CreditNote 1──1 Refund
+Refund → Payment (paid)
 AiExtraction 1──* RfqProposal
 
 Supplier 1──1 SupplierBankAccount
@@ -437,7 +441,9 @@ All routes below except login require `auth:sanctum`.
 php artisan test
 ```
 
-Latest full run: see Sprint 15 documentation commit for updated counts after this sprint.
+Latest full run: **237 tests**, **2805 assertions**, **0 failures**, **0 errors**, **0 skipped**.
+
+Focused Sprint 15 (`CreditNote*`): **10 tests**, **550 assertions**, **0 failures**.
 
 Coverage includes:
 
@@ -513,6 +519,8 @@ Business rules were validated by those tests and by reading the write paths (`Mo
 - Delivery confirmations require a delivered shipment. Buyer creates; supplier reads. One confirmation per shipment. Does not complete the PO or change invoice/payment state. No disputes or ratings.
 - RMAs require a delivered shipment with delivery confirmation. Buyer creates/cancels; supplier approves/rejects/receives/closes. One active RMA per shipment. Does not refund, adjust invoices, or modify inventory.
 - Return shipments require an approved RMA. Buyer creates/updates/cancels; supplier ships/delivers. One active return shipment per RMA. Does not auto-change RMA received/closed or financial records.
+- Credit notes require a closed RMA with a delivered return shipment and an invoice on the same PO. Supplier creates/issues/cancels/voids; buyer reads. One credit note per RMA. Amounts from RMA qty × invoice unit prices; tax proportional. Does not mutate invoice/payment.
+- Refunds require an issued credit note and a paid payment on the same invoice. Supplier creates/processes/fails/cancels; buyer reads. One refund per credit note. Amount = credit note total (≤ paid amount). Internal bookkeeping only — no gateway/bank transfer.
 - The mock extractor targets text like `Need 25,000 MT ICUMSA 45 Sugar, CIF Jeddah.`
 - Extraction confidence is `0.9`; source is `AI/mock`.
 - Proposals are created per differing field.
