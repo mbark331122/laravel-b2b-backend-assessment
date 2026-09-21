@@ -2,9 +2,11 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Product;
 use App\Models\Rfq;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 
 class UpdateRfqRequest extends FormRequest
 {
@@ -22,17 +24,21 @@ class UpdateRfqRequest extends FormRequest
     }
 
     /**
-     * @return array<string, list<string>>
+     * @return array<string, mixed>
      */
     public function rules(): array
     {
         return [
-            'commodity' => ['required', 'string', 'max:255'],
-            'specification' => ['required', 'string', 'max:255'],
-            'quantity' => ['required', 'integer', 'min:1'],
-            'unit' => ['required', 'string', 'max:50'],
-            'incoterm' => ['required', 'string', 'max:50'],
-            'destination' => ['required', 'string', 'max:255'],
+            'title' => ['sometimes', 'required', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'commodity' => ['sometimes', 'required', 'string', 'max:255'],
+            'specification' => ['sometimes', 'required', 'string', 'max:255'],
+            'quantity' => ['sometimes', 'required', 'integer', 'min:1'],
+            'unit' => ['sometimes', 'required', 'string', 'max:50'],
+            'incoterm' => ['sometimes', 'required', 'string', 'max:50'],
+            'destination' => ['sometimes', 'required', 'string', 'max:255'],
+            'currency' => ['nullable', 'string', 'size:3', Rule::in(Product::CURRENCIES)],
+            'required_by_date' => ['nullable', 'date', 'after_or_equal:today'],
         ];
     }
 }
