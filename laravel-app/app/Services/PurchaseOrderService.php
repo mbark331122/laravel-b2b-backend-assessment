@@ -87,6 +87,8 @@ class PurchaseOrderService
                 $this->snapshotItem($po, $item, $offer->currency, $index);
             }
 
+            app(TransactionVisibilityService::class)->ensureCoreParties($po, grantMutualIdentity: true);
+
             return [
                 'purchase_order' => $po->fresh([
                     'items',

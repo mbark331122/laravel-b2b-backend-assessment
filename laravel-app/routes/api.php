@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\BuyerQuotationController;
 use App\Http\Controllers\Api\CreditNoteController;
 use App\Http\Controllers\Api\DeliveryConfirmationController;
 use App\Http\Controllers\Api\InvoiceController;
+use App\Http\Controllers\Api\MultiPartyConfidentialityController;
 use App\Http\Controllers\Api\NegotiationController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\ProductCategoryController;
@@ -101,6 +102,20 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/purchase-orders/{purchaseOrder}/invoice', [InvoiceController::class, 'showForPurchaseOrder']);
     Route::post('/purchase-orders/{purchaseOrder}/shipment', [ShipmentController::class, 'store']);
     Route::get('/purchase-orders/{purchaseOrder}/shipment', [ShipmentController::class, 'showForPurchaseOrder']);
+
+    Route::get('/purchase-orders/{purchaseOrder}/parties', [MultiPartyConfidentialityController::class, 'parties']);
+    Route::post('/purchase-orders/{purchaseOrder}/parties', [MultiPartyConfidentialityController::class, 'storeParty']);
+    Route::get('/purchase-orders/{purchaseOrder}/parties/search', [MultiPartyConfidentialityController::class, 'searchParties']);
+    Route::get('/purchase-orders/{purchaseOrder}/parties/{party}', [MultiPartyConfidentialityController::class, 'showParty']);
+    Route::post('/purchase-orders/{purchaseOrder}/identity-grants', [MultiPartyConfidentialityController::class, 'grantIdentity']);
+    Route::post('/purchase-orders/{purchaseOrder}/identity-grants/revoke', [MultiPartyConfidentialityController::class, 'revokeIdentity']);
+    Route::get('/purchase-orders/{purchaseOrder}/commissions', [MultiPartyConfidentialityController::class, 'commissions']);
+    Route::post('/purchase-orders/{purchaseOrder}/commissions', [MultiPartyConfidentialityController::class, 'storeCommission']);
+    Route::get('/purchase-orders/{purchaseOrder}/confidential-notes', [MultiPartyConfidentialityController::class, 'confidentialNotes']);
+    Route::post('/purchase-orders/{purchaseOrder}/confidential-notes', [MultiPartyConfidentialityController::class, 'storeConfidentialNote']);
+    Route::get('/purchase-orders/{purchaseOrder}/export-view', [MultiPartyConfidentialityController::class, 'exportView']);
+    Route::get('/purchase-orders/{purchaseOrder}/visibility', [MultiPartyConfidentialityController::class, 'showPurchaseOrderScoped']);
+    Route::get('/commissions/{commission}', [MultiPartyConfidentialityController::class, 'showCommission']);
 
     Route::get('/invoices', [InvoiceController::class, 'index']);
     Route::get('/invoices/{invoice}', [InvoiceController::class, 'show']);

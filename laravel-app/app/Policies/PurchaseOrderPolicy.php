@@ -6,6 +6,7 @@ use App\Models\Negotiation;
 use App\Models\Permission;
 use App\Models\PurchaseOrder;
 use App\Models\User;
+use App\Services\TransactionVisibilityService;
 use Illuminate\Auth\Access\Response;
 
 class PurchaseOrderPolicy
@@ -13,7 +14,7 @@ class PurchaseOrderPolicy
     public function viewAny(User $user): bool
     {
         return $user->hasPermission(Permission::PURCHASE_ORDER_READ)
-            && ($user->isAdmin() || $user->isBuyerUser() || $user->isSupplierUser())
+            && ($user->isAdmin() || $user->isBuyerUser() || $user->isSupplierUser() || $user->isIntermediaryUser())
             && ($user->isAdmin() || $user->company_id !== null);
     }
 
@@ -33,6 +34,15 @@ class PurchaseOrderPolicy
 
         if ($user->isSupplierUser() && (int) $user->company_id === (int) $purchaseOrder->supplier_company_id) {
             // Suppliers only see POs after buyer submission.
+            if ($purchaseOrder->status === PurchaseOrder::STATUS_DRAFT) {
+                return Response::denyAsNotFound();
+            }
+
+            return Response::allow();
+        }
+
+        if ($user->company_id !== null
+            && app(TransactionVisibilityService::class)->actorParty($purchaseOrder, $user) !== null) {
             if ($purchaseOrder->status === PurchaseOrder::STATUS_DRAFT) {
                 return Response::denyAsNotFound();
             }

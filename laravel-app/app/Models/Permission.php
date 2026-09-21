@@ -157,6 +157,16 @@ class Permission extends Model
 
     public const REFUND_CANCEL = 'refund.cancel';
 
+    public const PURCHASE_ORDER_PARTY_READ = 'purchase_order.party.read';
+
+    public const PURCHASE_ORDER_PARTY_MANAGE = 'purchase_order.party.manage';
+
+    public const PURCHASE_ORDER_PARTY_IDENTITY_READ = 'purchase_order.party.identity.read';
+
+    public const PURCHASE_ORDER_COMMISSION_READ = 'purchase_order.commission.read';
+
+    public const PURCHASE_ORDER_CONFIDENTIAL_READ = 'purchase_order.confidential.read';
+
     public const BANK_READ = 'bank.read';
 
     public const BANK_CHANGE_REQUEST = 'bank.change_request';
@@ -224,6 +234,11 @@ class Permission extends Model
             self::PURCHASE_ORDER_CONFIRM,
             self::PURCHASE_ORDER_REJECT,
             self::PURCHASE_ORDER_COMPLETE,
+            self::PURCHASE_ORDER_PARTY_READ,
+            self::PURCHASE_ORDER_PARTY_MANAGE,
+            self::PURCHASE_ORDER_PARTY_IDENTITY_READ,
+            self::PURCHASE_ORDER_COMMISSION_READ,
+            self::PURCHASE_ORDER_CONFIDENTIAL_READ,
             self::INVOICE_READ,
             self::INVOICE_CREATE,
             self::INVOICE_ISSUE,
@@ -312,6 +327,9 @@ class Permission extends Model
             self::PURCHASE_ORDER_SUBMIT,
             self::PURCHASE_ORDER_CANCEL,
             self::PURCHASE_ORDER_COMPLETE,
+            self::PURCHASE_ORDER_PARTY_READ,
+            self::PURCHASE_ORDER_PARTY_MANAGE,
+            self::PURCHASE_ORDER_PARTY_IDENTITY_READ,
             self::INVOICE_READ,
             self::PAYMENT_READ,
             self::PAYMENT_CREATE,
@@ -368,6 +386,8 @@ class Permission extends Model
             self::PURCHASE_ORDER_READ,
             self::PURCHASE_ORDER_CONFIRM,
             self::PURCHASE_ORDER_REJECT,
+            self::PURCHASE_ORDER_PARTY_READ,
+            self::PURCHASE_ORDER_PARTY_IDENTITY_READ,
             self::INVOICE_READ,
             self::INVOICE_CREATE,
             self::INVOICE_ISSUE,
@@ -402,6 +422,21 @@ class Permission extends Model
             self::REFUND_PROCESS,
             self::REFUND_FAIL,
             self::REFUND_CANCEL,
+        ];
+    }
+
+    /**
+     * Permissions for intermediary company users (multi-party confidentiality).
+     *
+     * @return list<string>
+     */
+    public static function intermediaryUserNames(): array
+    {
+        return [
+            self::PURCHASE_ORDER_READ,
+            self::PURCHASE_ORDER_PARTY_READ,
+            self::PURCHASE_ORDER_PARTY_IDENTITY_READ,
+            self::PURCHASE_ORDER_COMMISSION_READ,
         ];
     }
 

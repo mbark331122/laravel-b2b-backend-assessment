@@ -70,6 +70,11 @@ class User extends Authenticatable
         return $this->company?->isSupplier() === true;
     }
 
+    public function isIntermediaryUser(): bool
+    {
+        return $this->hasRole(Role::INTERMEDIARY_USER);
+    }
+
     public function hasRole(string $role): bool
     {
         return $this->role?->name === $role;

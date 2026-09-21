@@ -208,9 +208,29 @@ class PurchaseOrder extends Model
     }
 
     /**
-     * @param  Builder<PurchaseOrder>  $query
-     * @return Builder<PurchaseOrder>
+     * @return HasMany<PurchaseOrderParty, $this>
      */
+    public function parties(): HasMany
+    {
+        return $this->hasMany(PurchaseOrderParty::class)->orderBy('sequence')->orderBy('id');
+    }
+
+    /**
+     * @return HasMany<IntermediaryCommission, $this>
+     */
+    public function commissions(): HasMany
+    {
+        return $this->hasMany(IntermediaryCommission::class)->orderBy('id');
+    }
+
+    /**
+     * @return HasMany<PurchaseOrderConfidentialNote, $this>
+     */
+    public function confidentialNotes(): HasMany
+    {
+        return $this->hasMany(PurchaseOrderConfidentialNote::class)->orderBy('id');
+    }
+
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
         if ($user->isAdmin()) {
@@ -219,7 +239,11 @@ class PurchaseOrder extends Model
 
         return $query->where(function ($inner) use ($user): void {
             $inner->where('buyer_company_id', $user->company_id)
-                ->orWhere('supplier_company_id', $user->company_id);
+                ->orWhere('supplier_company_id', $user->company_id)
+                ->orWhereHas('parties', function ($parties) use ($user): void {
+                    $parties->where('company_id', $user->company_id)
+                        ->where('status', PurchaseOrderParty::STATUS_ACTIVE);
+                });
         });
     }
 

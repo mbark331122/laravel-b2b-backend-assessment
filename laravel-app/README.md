@@ -2,11 +2,12 @@
 
 B2B procurement and supplier commerce API (multi-tenant). Current codebase includes identity/tenancy, supplier profiles, wholesale product catalog, RFQs, supplier matching & distribution, quotations, negotiation with immutable counter-offers, purchase orders with supplier confirmation, commercial invoices (snapshotted from confirmed POs), payment foundation (manual lifecycle, no gateway), shipping & fulfillment foundation (one shipment per confirmed PO, no carrier APIs), buyer delivery confirmation (immutable receipt acknowledgment), returns/RMA foundation (buyer request + supplier review), RMA return logistics (return shipments for approved RMAs; no carrier APIs), RMA financial resolution foundation (credit notes + internal refund records after closed RMA; no external money movement), mocked AI extraction with human approval, supplier bank-change approval, and auditability.
 
-**Sprint 16 finalized the core B2B scope** with end-to-end integration tests, cross-domain security hardening, and lifecycle consistency fixes. No further product domains are planned beyond this workflow.
+**Sprint 16 finalized the core B2B scope** with end-to-end integration tests, cross-domain security hardening, and lifecycle consistency fixes. **Assessment 2** adds multi-party confidentiality on purchase orders (normalized parties, identity grants, intermediary commissions) — see [`docs/assessment-2/MULTI-PARTY-CONFIDENTIALITY.md`](docs/assessment-2/MULTI-PARTY-CONFIDENTIALITY.md).
 
 There is no frontend. The API is the product.
 
 **Sprint 0 architecture docs:** [`docs/sprint-0/`](docs/sprint-0/)
+**Assessment 2 confidentiality:** [`docs/assessment-2/`](docs/assessment-2/)
 
 ## Architecture
 
@@ -16,7 +17,7 @@ This is a single Laravel 13 API application.
 
 **Tenancy.** `Company` is the tenant. Companies are classified with `is_buyer` / `is_supplier` (set only by trusted backend/seeders — not client input). Company users have a `company_id`. Admin has no company and can operate across tenants when a permission allows it. Queries and policies scope company users to their own company. RFQ creation additionally requires a buyer company.
 
-**Authorization.** Roles (`admin`, `company_user`, `supplier_user`) own permissions. Policies enforce permission + tenant (and buyer/supplier classification) on every sensitive operation.
+**Authorization.** Roles (`admin`, `company_user`, `supplier_user`, `intermediary_user`) own permissions. Policies enforce permission + tenant (and buyer/supplier/intermediary participation) on every sensitive operation. Multi-party identity and commission visibility are separate from transaction read — see Assessment 2 docs.
 
 **Catalog.** Supplier companies own a `SupplierProfile` and wholesale `Product` rows (brand, specs, MOQ/max/increment, base price + tiers, lifecycle). Buyers may browse/view **published** products only. New supplier products start as `draft` and require lifecycle review before publication. Product ownership always comes from the authenticated supplier company — never from client `company_id` / `supplier_id` / `tenant_id`.
 
@@ -29,6 +30,8 @@ This is a single Laravel 13 API application.
 **Negotiation.** Participants open a negotiation against an active submitted quotation (`POST /api/quotations/{quotation}/negotiation`). An immutable initial offer (sequence 1, supplier side) is snapshotted from the quotation. Counter-offers are append-only (`POST /api/negotiations/{negotiation}/offers`) with server-enforced alternating turns. Offers cannot be edited or deleted. Lifecycle: `open` → `accepted` | `rejected` | `withdrawn` | `expired`. Acceptance is by the opposite party on the latest proposed unexpired offer (transaction + row locks). After a quotation is **accepted**, a new negotiation cannot be opened for that quotation. Original quotation is never mutated. No ranking or automatic winner selection.
 
 **Purchase Orders.** Buyers create a PO only from an **accepted** negotiation (`POST /api/negotiations/{negotiation}/purchase-order`). Commercial terms are snapshotted from the accepted offer (immutable). One PO per negotiation (unique `negotiation_id`); idempotent re-create returns the existing PO. Server-generated unique `number` (`PO-{YEAR}-{id}`). Lifecycle: `draft` → `pending_supplier_confirmation` → `confirmed` → `completed` (or `rejected` / `cancelled`). Supplier confirms/rejects after submit; buyer cancels while draft/pending; buyer completes confirmed POs.
+
+**Multi-party confidentiality (Assessment 2).** The PO is the transaction anchor. Normalized `purchase_order_parties` support buyer, supplier, and N intermediaries. Identity visibility requires explicit `party_identity_grants` (classic direct trade grants mutual buyer↔supplier identity on create). Intermediary commissions are bound to a party row and visible only to that intermediary (or privileged admin). Enforcement is in `TransactionVisibilityService`, policies, and authorization-aware serialization — not the UI.
 
 **Commercial Invoices.** Suppliers create an invoice only from a **confirmed** purchase order (`POST /api/purchase-orders/{purchaseOrder}/invoice`). Commercial values are snapshotted from the confirmed PO (immutable after create). One invoice per PO (unique `purchase_order_id`); idempotent re-create returns the existing invoice. Server-generated unique `number` (`INV-{YEAR}-{id}`). Lifecycle: `draft` → `issued` | `cancelled`; `issued` → `voided` | `paid` (`paid` only via payment mark-paid). Void is blocked while a pending or paid payment exists. No ZATCA, tax engines, shipping, or fulfillment. Credit notes / refunds are a separate financial-resolution domain (Sprint 15).
 

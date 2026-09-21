@@ -16,6 +16,8 @@ class Role extends Model
 
     public const SUPPLIER_USER = 'supplier_user';
 
+    public const INTERMEDIARY_USER = 'intermediary_user';
+
     /**
      * @return HasMany<User, $this>
      */

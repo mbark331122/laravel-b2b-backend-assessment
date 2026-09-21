@@ -10,6 +10,7 @@ use App\Models\Negotiation;
 use App\Models\PurchaseOrder;
 use App\Services\AuditLogger;
 use App\Services\PurchaseOrderService;
+use App\Services\TransactionVisibilityService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -24,6 +25,7 @@ class PurchaseOrderController extends Controller
         Gate::authorize('viewAny', PurchaseOrder::class);
 
         $user = $request->user();
+        $visibility = app(TransactionVisibilityService::class);
         $query = PurchaseOrder::query()
             ->with(['items', 'buyerCompany', 'supplierCompany.supplierProfile'])
             ->visibleTo($user)
@@ -36,7 +38,7 @@ class PurchaseOrderController extends Controller
         }
 
         $orders = $query->get()
-            ->map(fn (PurchaseOrder $po) => $po->toApiArray())
+            ->map(fn (PurchaseOrder $po) => $visibility->serializePurchaseOrder($user, $po))
             ->values();
 
         return response()->json([
@@ -53,6 +55,8 @@ class PurchaseOrderController extends Controller
             abort(403);
         }
 
+        $visibility = app(TransactionVisibilityService::class);
+
         $orders = PurchaseOrder::query()
             ->with(['items', 'buyerCompany', 'supplierCompany.supplierProfile'])
             ->where('supplier_company_id', $user->company_id)
@@ -65,7 +69,7 @@ class PurchaseOrderController extends Controller
             ])
             ->orderByDesc('id')
             ->get()
-            ->map(fn (PurchaseOrder $po) => $po->toApiArray())
+            ->map(fn (PurchaseOrder $po) => $visibility->serializePurchaseOrder($user, $po))
             ->values();
 
         return response()->json([
@@ -73,16 +77,19 @@ class PurchaseOrderController extends Controller
         ]);
     }
 
-    public function show(PurchaseOrder $purchaseOrder): JsonResponse
+    public function show(Request $request, PurchaseOrder $purchaseOrder): JsonResponse
     {
         Gate::authorize('view', $purchaseOrder);
 
+        $purchaseOrder->load([
+            'items',
+            'buyerCompany',
+            'supplierCompany.supplierProfile',
+        ]);
+
         return response()->json([
-            'purchase_order' => $purchaseOrder->load([
-                'items',
-                'buyerCompany',
-                'supplierCompany.supplierProfile',
-            ])->toApiArray(),
+            'purchase_order' => app(TransactionVisibilityService::class)
+                ->serializePurchaseOrder($request->user(), $purchaseOrder),
         ]);
     }
 

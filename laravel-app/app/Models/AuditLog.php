@@ -140,6 +140,22 @@ class AuditLog extends Model
 
     public const REFUND_CANCELLED = 'refund.cancelled';
 
+    public const PARTY_ADDED = 'purchase_order.party.added';
+
+    public const PARTY_IDENTITY_GRANTED = 'purchase_order.party.identity_granted';
+
+    public const PARTY_IDENTITY_REVOKED = 'purchase_order.party.identity_revoked';
+
+    public const PARTY_IDENTITY_VIEWED = 'purchase_order.party.identity_viewed';
+
+    public const COMMISSION_SET = 'purchase_order.commission.set';
+
+    public const COMMISSION_VIEWED = 'purchase_order.commission.viewed';
+
+    public const CONFIDENTIAL_NOTE_CREATED = 'purchase_order.confidential.created';
+
+    public const CONFIDENTIAL_VIEWED = 'purchase_order.confidential.viewed';
+
     public const RFQ_APPROVED = 'rfq.approved';
 
     public const PROPOSAL_CREATED = 'proposal.created';
