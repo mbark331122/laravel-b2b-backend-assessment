@@ -97,10 +97,12 @@ class PurchaseOrderController extends Controller
         StorePurchaseOrderRequest $request,
         Negotiation $negotiation,
         PurchaseOrderService $purchaseOrders,
+        TransactionVisibilityService $visibility,
     ): JsonResponse {
         Gate::authorize('createFromNegotiation', [PurchaseOrder::class, $negotiation]);
 
-        $result = $purchaseOrders->createFromAcceptedNegotiation($negotiation, $request->user());
+        $user = $request->user();
+        $result = $purchaseOrders->createFromAcceptedNegotiation($negotiation, $user);
         $po = $result['purchase_order'];
 
         if ($result['created']) {
@@ -113,14 +115,19 @@ class PurchaseOrderController extends Controller
         }
 
         return response()->json([
-            'purchase_order' => $po->toApiArray(),
+            'purchase_order' => $visibility->serializePurchaseOrder($user, $po),
         ], $result['created'] ? 201 : 200);
     }
 
-    public function submit(Request $request, PurchaseOrder $purchaseOrder, PurchaseOrderService $purchaseOrders): JsonResponse
-    {
+    public function submit(
+        Request $request,
+        PurchaseOrder $purchaseOrder,
+        PurchaseOrderService $purchaseOrders,
+        TransactionVisibilityService $visibility,
+    ): JsonResponse {
         Gate::authorize('submit', $purchaseOrder);
 
+        $user = $request->user();
         $before = $purchaseOrder->toApiArray();
         $po = $purchaseOrders->submit($purchaseOrder);
 
@@ -134,14 +141,19 @@ class PurchaseOrderController extends Controller
         );
 
         return response()->json([
-            'purchase_order' => $po->toApiArray(),
+            'purchase_order' => $visibility->serializePurchaseOrder($user, $po),
         ]);
     }
 
-    public function cancel(Request $request, PurchaseOrder $purchaseOrder, PurchaseOrderService $purchaseOrders): JsonResponse
-    {
+    public function cancel(
+        Request $request,
+        PurchaseOrder $purchaseOrder,
+        PurchaseOrderService $purchaseOrders,
+        TransactionVisibilityService $visibility,
+    ): JsonResponse {
         Gate::authorize('cancel', $purchaseOrder);
 
+        $user = $request->user();
         $before = $purchaseOrder->toApiArray();
         $po = $purchaseOrders->cancel($purchaseOrder);
 
@@ -155,14 +167,19 @@ class PurchaseOrderController extends Controller
         );
 
         return response()->json([
-            'purchase_order' => $po->toApiArray(),
+            'purchase_order' => $visibility->serializePurchaseOrder($user, $po),
         ]);
     }
 
-    public function complete(Request $request, PurchaseOrder $purchaseOrder, PurchaseOrderService $purchaseOrders): JsonResponse
-    {
+    public function complete(
+        Request $request,
+        PurchaseOrder $purchaseOrder,
+        PurchaseOrderService $purchaseOrders,
+        TransactionVisibilityService $visibility,
+    ): JsonResponse {
         Gate::authorize('complete', $purchaseOrder);
 
+        $user = $request->user();
         $before = $purchaseOrder->toApiArray();
         $po = $purchaseOrders->complete($purchaseOrder);
 
@@ -176,14 +193,19 @@ class PurchaseOrderController extends Controller
         );
 
         return response()->json([
-            'purchase_order' => $po->toApiArray(),
+            'purchase_order' => $visibility->serializePurchaseOrder($user, $po),
         ]);
     }
 
-    public function confirm(Request $request, PurchaseOrder $purchaseOrder, PurchaseOrderService $purchaseOrders): JsonResponse
-    {
+    public function confirm(
+        Request $request,
+        PurchaseOrder $purchaseOrder,
+        PurchaseOrderService $purchaseOrders,
+        TransactionVisibilityService $visibility,
+    ): JsonResponse {
         Gate::authorize('confirm', $purchaseOrder);
 
+        $user = $request->user();
         $before = $purchaseOrder->toApiArray();
         $po = $purchaseOrders->confirm($purchaseOrder);
 
@@ -197,7 +219,7 @@ class PurchaseOrderController extends Controller
         );
 
         return response()->json([
-            'purchase_order' => $po->toApiArray(),
+            'purchase_order' => $visibility->serializePurchaseOrder($user, $po),
         ]);
     }
 
@@ -205,9 +227,11 @@ class PurchaseOrderController extends Controller
         RejectPurchaseOrderRequest $request,
         PurchaseOrder $purchaseOrder,
         PurchaseOrderService $purchaseOrders,
+        TransactionVisibilityService $visibility,
     ): JsonResponse {
         Gate::authorize('reject', $purchaseOrder);
 
+        $user = $request->user();
         $before = $purchaseOrder->toApiArray();
         $po = $purchaseOrders->reject($purchaseOrder, (string) $request->validated('reason'));
 
@@ -221,7 +245,7 @@ class PurchaseOrderController extends Controller
         );
 
         return response()->json([
-            'purchase_order' => $po->toApiArray(),
+            'purchase_order' => $visibility->serializePurchaseOrder($user, $po),
         ]);
     }
 }

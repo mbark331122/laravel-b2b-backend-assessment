@@ -287,6 +287,52 @@ class MultiPartyConfidentialitySecurityTest extends SecurityTestCase
             ->assertJsonPath('purchase_order.supplier_company.id', $supplier->company_id);
     }
 
+    public function test_mutation_responses_cannot_bypass_revoked_identity_grants(): void
+    {
+        [$buyer, $supplier, $poId] = $this->draftPoOnly('Mutation Leak Guard');
+
+        $visibility = app(TransactionVisibilityService::class);
+        $po = PurchaseOrder::query()->findOrFail($poId);
+        $cores = $visibility->ensureCoreParties($po, grantMutualIdentity: false);
+        $visibility->revokeIdentity($po, $cores['buyer'], $cores['supplier']);
+        $visibility->revokeIdentity($po, $cores['supplier'], $cores['buyer']);
+
+        $this->actingAs($buyer, 'sanctum')
+            ->getJson('/api/purchase-orders/'.$poId)
+            ->assertOk()
+            ->assertJsonPath('purchase_order.buyer_company.id', $buyer->company_id)
+            ->assertJsonPath('purchase_order.supplier_company', null);
+
+        $submit = $this->actingAs($buyer, 'sanctum')
+            ->postJson('/api/purchase-orders/'.$poId.'/submit')
+            ->assertOk()
+            ->json('purchase_order');
+
+        $this->assertNotNull($submit['buyer_company']);
+        $this->assertSame($buyer->company_id, $submit['buyer_company']['id']);
+        $this->assertNull($submit['supplier_company']);
+        $this->assertArrayNotHasKey('id', $submit['supplier_company'] ?? []);
+        $this->assertArrayNotHasKey('name', $submit['supplier_company'] ?? []);
+
+        $this->actingAs($supplier, 'sanctum')
+            ->getJson('/api/purchase-orders/'.$poId)
+            ->assertOk()
+            ->assertJsonPath('purchase_order.supplier_company.id', $supplier->company_id)
+            ->assertJsonPath('purchase_order.buyer_company', null);
+
+        $confirm = $this->actingAs($supplier, 'sanctum')
+            ->postJson('/api/supplier/purchase-orders/'.$poId.'/confirm')
+            ->assertOk()
+            ->assertJsonPath('purchase_order.status', PurchaseOrder::STATUS_CONFIRMED)
+            ->json('purchase_order');
+
+        $this->assertNotNull($confirm['supplier_company']);
+        $this->assertSame($supplier->company_id, $confirm['supplier_company']['id']);
+        $this->assertNull($confirm['buyer_company']);
+        $this->assertArrayNotHasKey('id', $confirm['buyer_company'] ?? []);
+        $this->assertArrayNotHasKey('name', $confirm['buyer_company'] ?? []);
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -399,7 +445,34 @@ class MultiPartyConfidentialitySecurityTest extends SecurityTestCase
     /**
      * @return array{0: User, 1: User, 2: int}
      */
+    private function draftPoOnly(string $title): array
+    {
+        [$buyer, $supplier, $poId] = $this->createAcceptedNegotiationPurchaseOrder($title);
+
+        return [$buyer, $supplier, $poId];
+    }
+
+    /**
+     * @return array{0: User, 1: User, 2: int}
+     */
     private function confirmedPoOnly(string $title): array
+    {
+        [$buyer, $supplier, $poId] = $this->createAcceptedNegotiationPurchaseOrder($title);
+        $this->actingAs($buyer, 'sanctum')->postJson('/api/purchase-orders/'.$poId.'/submit')->assertOk();
+        $this->actingAs($supplier, 'sanctum')
+            ->postJson('/api/supplier/purchase-orders/'.$poId.'/confirm')
+            ->assertOk()
+            ->assertJsonPath('purchase_order.status', PurchaseOrder::STATUS_CONFIRMED);
+
+        return [$buyer, $supplier, $poId];
+    }
+
+    /**
+     * Build RFQ → quotation → accepted negotiation → draft PO.
+     *
+     * @return array{0: User, 1: User, 2: int}
+     */
+    private function createAcceptedNegotiationPurchaseOrder(string $title): array
     {
         $buyer = $this->userA();
         $supplier = $this->supplierUser();
@@ -467,11 +540,6 @@ class MultiPartyConfidentialitySecurityTest extends SecurityTestCase
             ->postJson('/api/negotiations/'.$negotiationId.'/purchase-order')
             ->assertCreated()
             ->json('purchase_order.id');
-        $this->actingAs($buyer, 'sanctum')->postJson('/api/purchase-orders/'.$poId.'/submit')->assertOk();
-        $this->actingAs($supplier, 'sanctum')
-            ->postJson('/api/supplier/purchase-orders/'.$poId.'/confirm')
-            ->assertOk()
-            ->assertJsonPath('purchase_order.status', PurchaseOrder::STATUS_CONFIRMED);
 
         return [$buyer, $supplier, $poId];
     }

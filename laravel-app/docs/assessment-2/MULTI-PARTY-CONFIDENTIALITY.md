@@ -82,6 +82,8 @@ Routes (under Sanctum):
 - `GET/POST .../confidential-notes`
 - `GET .../export-view`, `GET .../visibility`
 
+All Purchase Order JSON responses that return a PO representation — including lifecycle mutations (`create`, `submit`, `cancel`, `complete`, `confirm`, `reject`) — use `TransactionVisibilityService::serializePurchaseOrder` for the authenticated actor. Ungated `PurchaseOrder::toApiArray()` is not used for API response bodies.
+
 Policies: `PurchaseOrderPolicy`, `PurchaseOrderPartyPolicy`, `IntermediaryCommissionPolicy`.
 
 Cross-PO party/commission mismatch → 404. Client `include=confidential|commissions` ignored. Spoofed `role` / `visibility` / `company_id` / `is_internal` on write are ignored or rejected by server rules.
