@@ -446,7 +446,9 @@ All routes below except login require `auth:sanctum`.
 php artisan test
 ```
 
-Latest full run: **244 tests**, **3195 assertions**, **0 failures**, **0 errors**, **0 skipped**.
+Latest full run: **251 tests**, **3398 assertions**, **0 failures**, **0 errors**, **0 skipped**.
+
+Assessment 2 focused (`MultiPartyConfidentialitySecurityTest`): **7 tests**, **203 assertions**, **0 failures**.
 
 Sprint 16 focused (`FullB2bLifecycle*` + `FinalB2bSecurity*`): **7 tests**, **390 assertions**, **0 failures**.
 
@@ -458,6 +460,8 @@ Coverage includes:
 - PO lifecycle submit / confirm / reject / cancel / complete
 - PO snapshot integrity vs product mutations
 - PO number uniqueness and idempotent creation
+- Multi-party confidentiality: identity grants, commission isolation, N intermediaries (Assessment 2)
+- Multi-party IDOR / search / export-view / mass-assignment bypass attempts (Assessment 2)
 - Invoice creation from confirmed PO (one invoice per PO)
 - Invoice lifecycle issue / cancel / void
 - Invoice void blocked when pending/paid payment exists
