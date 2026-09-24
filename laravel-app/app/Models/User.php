@@ -54,6 +54,27 @@ class User extends Authenticatable
         return $this->hasRole(Role::ADMIN);
     }
 
+    /**
+     * Buyer capability is resolved from the user's authorized company, never from client input.
+     */
+    public function isBuyerUser(): bool
+    {
+        return $this->company?->isBuyer() === true;
+    }
+
+    /**
+     * Supplier capability is resolved from the user's authorized company, never from client input.
+     */
+    public function isSupplierUser(): bool
+    {
+        return $this->company?->isSupplier() === true;
+    }
+
+    public function isIntermediaryUser(): bool
+    {
+        return $this->hasRole(Role::INTERMEDIARY_USER);
+    }
+
     public function hasRole(string $role): bool
     {
         return $this->role?->name === $role;
@@ -84,10 +105,7 @@ class User extends Authenticatable
             'name' => $this->name,
             'email' => $this->email,
             'is_admin' => $this->isAdmin(),
-            'company' => $this->company ? [
-                'id' => $this->company->id,
-                'name' => $this->company->name,
-            ] : null,
+            'company' => $this->company?->toApiArray(),
             'role' => $this->role?->name,
             'permissions' => $this->permissionNames(),
         ];
