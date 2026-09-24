@@ -2,7 +2,7 @@
 
 B2B procurement and supplier commerce API (multi-tenant). Current codebase includes identity/tenancy, supplier profiles, wholesale product catalog, RFQs, supplier matching & distribution, quotations, negotiation with immutable counter-offers, purchase orders with supplier confirmation, commercial invoices (snapshotted from confirmed POs), payment foundation (manual lifecycle, no gateway), shipping & fulfillment foundation (one shipment per confirmed PO, no carrier APIs), buyer delivery confirmation (immutable receipt acknowledgment), returns/RMA foundation (buyer request + supplier review), RMA return logistics (return shipments for approved RMAs; no carrier APIs), RMA financial resolution foundation (credit notes + internal refund records after closed RMA; no external money movement), mocked AI extraction with human approval, supplier bank-change approval, and auditability.
 
-**Sprint 16 finalized the core B2B scope** with end-to-end integration tests, cross-domain security hardening, and lifecycle consistency fixes. **Assessment 2** adds multi-party confidentiality on purchase orders (normalized parties, identity grants, intermediary commissions) — see [`docs/assessment-2/MULTI-PARTY-CONFIDENTIALITY.md`](docs/assessment-2/MULTI-PARTY-CONFIDENTIALITY.md). **Sprint 17** is Scope 2 foundation only (pagination opt-in, query indexes, quotation create locking, read-path visibility performance, expiration audits) — see [`docs/sprint-17/`](docs/sprint-17/). **Sprint 18** adds company business onboarding (profile, addresses, contacts, members, invitations) — see [`docs/sprint-18/`](docs/sprint-18/).
+**Sprint 16 finalized the core B2B scope** with end-to-end integration tests, cross-domain security hardening, and lifecycle consistency fixes. **Assessment 2** adds multi-party confidentiality on purchase orders (normalized parties, identity grants, intermediary commissions) — see [`docs/assessment-2/MULTI-PARTY-CONFIDENTIALITY.md`](docs/assessment-2/MULTI-PARTY-CONFIDENTIALITY.md). **Sprint 17** is Scope 2 foundation only (pagination opt-in, query indexes, quotation create locking, read-path visibility performance, expiration audits) — see [`docs/sprint-17/`](docs/sprint-17/). **Sprint 18** adds company business onboarding (profile, addresses, contacts, members, invitations) — see [`docs/sprint-18/`](docs/sprint-18/). **Sprint 19** adds tenant-scoped approval policies/requests with RFQ/PO submit gates — see [`docs/sprint-19/`](docs/sprint-19/).
 
 There is no frontend. The API is the product.
 
@@ -446,9 +446,11 @@ All routes below except login require `auth:sanctum`.
 php artisan test
 ```
 
-Latest full run: **276 tests**, **3572 assertions**, **0 failures**, **0 errors**, **0 skipped**.
+Latest full run: **288 tests**, **3670 assertions**, **0 failures**, **0 errors**, **0 skipped**.
 
 Assessment 2 focused (`MultiPartyConfidentialitySecurityTest`): **8 tests**, **233 assertions**, **0 failures**.
+
+Sprint 19 focused (`ApprovalWorkflow*`): **12 tests**, **98 assertions**, **0 failures**.
 
 Sprint 18 focused (`CompanyOnboarding*`): **20 tests**, **105 assertions**, **0 failures**.
 
