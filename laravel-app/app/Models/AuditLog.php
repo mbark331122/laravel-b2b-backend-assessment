@@ -190,6 +190,32 @@ class AuditLog extends Model
 
     public const PRODUCT_PRICE_TIERS_UPDATED = 'product.price_tiers.updated';
 
+    public const COMPANY_PROFILE_UPDATED = 'company.profile.updated';
+
+    public const COMPANY_ADDRESS_CREATED = 'company.address.created';
+
+    public const COMPANY_ADDRESS_UPDATED = 'company.address.updated';
+
+    public const COMPANY_ADDRESS_DELETED = 'company.address.deleted';
+
+    public const COMPANY_CONTACT_CREATED = 'company.contact.created';
+
+    public const COMPANY_CONTACT_UPDATED = 'company.contact.updated';
+
+    public const COMPANY_CONTACT_DELETED = 'company.contact.deleted';
+
+    public const COMPANY_MEMBER_ACTIVATED = 'company.member.activated';
+
+    public const COMPANY_MEMBER_DEACTIVATED = 'company.member.deactivated';
+
+    public const COMPANY_INVITATION_CREATED = 'company.invitation.created';
+
+    public const COMPANY_INVITATION_ACCEPTED = 'company.invitation.accepted';
+
+    public const COMPANY_INVITATION_REVOKED = 'company.invitation.revoked';
+
+    public const COMPANY_INVITATION_EXPIRED = 'company.invitation.expired';
+
     /**
      * @var list<string>
      */

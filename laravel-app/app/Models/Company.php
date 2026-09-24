@@ -67,6 +67,38 @@ class Company extends Model
     }
 
     /**
+     * @return HasOne<CompanyProfile, $this>
+     */
+    public function profile(): HasOne
+    {
+        return $this->hasOne(CompanyProfile::class);
+    }
+
+    /**
+     * @return HasMany<CompanyAddress, $this>
+     */
+    public function addresses(): HasMany
+    {
+        return $this->hasMany(CompanyAddress::class);
+    }
+
+    /**
+     * @return HasMany<CompanyContact, $this>
+     */
+    public function contacts(): HasMany
+    {
+        return $this->hasMany(CompanyContact::class);
+    }
+
+    /**
+     * @return HasMany<CompanyInvitation, $this>
+     */
+    public function invitations(): HasMany
+    {
+        return $this->hasMany(CompanyInvitation::class);
+    }
+
+    /**
      * @return HasMany<Product, $this>
      */
     public function products(): HasMany

@@ -21,6 +21,12 @@ class AuthController extends Controller
             ], 401);
         }
 
+        if ($user->company_id !== null && ! $user->isActiveMember()) {
+            return response()->json([
+                'message' => 'This membership is deactivated.',
+            ], 403);
+        }
+
         return response()->json([
             'token' => $user->createToken('api')->plainTextToken,
             'user' => $user->toApiArray(),

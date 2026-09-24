@@ -5,6 +5,11 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BankChangeRequestController;
 use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\BuyerQuotationController;
+use App\Http\Controllers\Api\CompanyAddressController;
+use App\Http\Controllers\Api\CompanyContactController;
+use App\Http\Controllers\Api\CompanyInvitationController;
+use App\Http\Controllers\Api\CompanyMemberController;
+use App\Http\Controllers\Api\CompanyProfileController;
 use App\Http\Controllers\Api\CreditNoteController;
 use App\Http\Controllers\Api\DeliveryConfirmationController;
 use App\Http\Controllers\Api\InvoiceController;
@@ -31,10 +36,39 @@ use App\Http\Controllers\Api\SupplierRfqController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/invitations/accept', [CompanyInvitationController::class, 'accept']);
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'active.company'])->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
+
+    Route::get('/company/profile', [CompanyProfileController::class, 'show']);
+    Route::put('/company/profile', [CompanyProfileController::class, 'upsert']);
+    Route::patch('/company/profile', [CompanyProfileController::class, 'upsert']);
+
+    Route::get('/company/addresses', [CompanyAddressController::class, 'index']);
+    Route::post('/company/addresses', [CompanyAddressController::class, 'store']);
+    Route::get('/company/addresses/{companyAddress}', [CompanyAddressController::class, 'show']);
+    Route::put('/company/addresses/{companyAddress}', [CompanyAddressController::class, 'update']);
+    Route::patch('/company/addresses/{companyAddress}', [CompanyAddressController::class, 'update']);
+    Route::delete('/company/addresses/{companyAddress}', [CompanyAddressController::class, 'destroy']);
+
+    Route::get('/company/contacts', [CompanyContactController::class, 'index']);
+    Route::post('/company/contacts', [CompanyContactController::class, 'store']);
+    Route::get('/company/contacts/{companyContact}', [CompanyContactController::class, 'show']);
+    Route::put('/company/contacts/{companyContact}', [CompanyContactController::class, 'update']);
+    Route::patch('/company/contacts/{companyContact}', [CompanyContactController::class, 'update']);
+    Route::delete('/company/contacts/{companyContact}', [CompanyContactController::class, 'destroy']);
+
+    Route::get('/company/members', [CompanyMemberController::class, 'index']);
+    Route::get('/company/members/{member}', [CompanyMemberController::class, 'show']);
+    Route::post('/company/members/{member}/activate', [CompanyMemberController::class, 'activate']);
+    Route::post('/company/members/{member}/deactivate', [CompanyMemberController::class, 'deactivate']);
+
+    Route::get('/company/invitations', [CompanyInvitationController::class, 'index']);
+    Route::post('/company/invitations', [CompanyInvitationController::class, 'store']);
+    Route::get('/company/invitations/{companyInvitation}', [CompanyInvitationController::class, 'show']);
+    Route::post('/company/invitations/{companyInvitation}/revoke', [CompanyInvitationController::class, 'revoke']);
 
     Route::apiResource('rfqs', RfqController::class);
     Route::post('/rfqs/{rfq}/submit', [RfqController::class, 'submit']);

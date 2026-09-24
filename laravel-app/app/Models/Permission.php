@@ -191,6 +191,28 @@ class Permission extends Model
 
     public const BRAND_CREATE = 'brand.create';
 
+    public const COMPANY_PROFILE_READ = 'company.profile.read';
+
+    public const COMPANY_PROFILE_UPDATE = 'company.profile.update';
+
+    public const COMPANY_ADDRESS_READ = 'company.address.read';
+
+    public const COMPANY_ADDRESS_MANAGE = 'company.address.manage';
+
+    public const COMPANY_CONTACT_READ = 'company.contact.read';
+
+    public const COMPANY_CONTACT_MANAGE = 'company.contact.manage';
+
+    public const COMPANY_MEMBER_READ = 'company.member.read';
+
+    public const COMPANY_MEMBER_MANAGE = 'company.member.manage';
+
+    public const COMPANY_INVITATION_CREATE = 'company.invitation.create';
+
+    public const COMPANY_INVITATION_READ = 'company.invitation.read';
+
+    public const COMPANY_INVITATION_MANAGE = 'company.invitation.manage';
+
     /**
      * Platform permission catalog.
      *
@@ -293,6 +315,39 @@ class Permission extends Model
             self::SUPPLIER_PROFILE_CREATE,
             self::SUPPLIER_PROFILE_UPDATE,
             self::BRAND_CREATE,
+            self::COMPANY_PROFILE_READ,
+            self::COMPANY_PROFILE_UPDATE,
+            self::COMPANY_ADDRESS_READ,
+            self::COMPANY_ADDRESS_MANAGE,
+            self::COMPANY_CONTACT_READ,
+            self::COMPANY_CONTACT_MANAGE,
+            self::COMPANY_MEMBER_READ,
+            self::COMPANY_MEMBER_MANAGE,
+            self::COMPANY_INVITATION_CREATE,
+            self::COMPANY_INVITATION_READ,
+            self::COMPANY_INVITATION_MANAGE,
+        ];
+    }
+
+    /**
+     * Company onboarding permissions for tenant members (buyer, supplier, intermediary).
+     *
+     * @return list<string>
+     */
+    public static function companyOnboardingNames(): array
+    {
+        return [
+            self::COMPANY_PROFILE_READ,
+            self::COMPANY_PROFILE_UPDATE,
+            self::COMPANY_ADDRESS_READ,
+            self::COMPANY_ADDRESS_MANAGE,
+            self::COMPANY_CONTACT_READ,
+            self::COMPANY_CONTACT_MANAGE,
+            self::COMPANY_MEMBER_READ,
+            self::COMPANY_MEMBER_MANAGE,
+            self::COMPANY_INVITATION_CREATE,
+            self::COMPANY_INVITATION_READ,
+            self::COMPANY_INVITATION_MANAGE,
         ];
     }
 
@@ -350,6 +405,7 @@ class Permission extends Model
             self::BANK_CHANGE_REQUEST,
             self::PRODUCT_READ,
             self::SUPPLIER_PROFILE_READ,
+            ...self::companyOnboardingNames(),
         ];
     }
 
@@ -422,6 +478,7 @@ class Permission extends Model
             self::REFUND_PROCESS,
             self::REFUND_FAIL,
             self::REFUND_CANCEL,
+            ...self::companyOnboardingNames(),
         ];
     }
 
@@ -437,6 +494,7 @@ class Permission extends Model
             self::PURCHASE_ORDER_PARTY_READ,
             self::PURCHASE_ORDER_PARTY_IDENTITY_READ,
             self::PURCHASE_ORDER_COMMISSION_READ,
+            ...self::companyOnboardingNames(),
         ];
     }
 
