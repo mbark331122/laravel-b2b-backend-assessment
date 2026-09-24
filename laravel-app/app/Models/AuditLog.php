@@ -216,6 +216,24 @@ class AuditLog extends Model
 
     public const COMPANY_INVITATION_EXPIRED = 'company.invitation.expired';
 
+    public const APPROVAL_POLICY_CREATED = 'approval.policy.created';
+
+    public const APPROVAL_POLICY_UPDATED = 'approval.policy.updated';
+
+    public const APPROVAL_POLICY_ACTIVATED = 'approval.policy.activated';
+
+    public const APPROVAL_POLICY_DEACTIVATED = 'approval.policy.deactivated';
+
+    public const APPROVAL_REQUEST_CREATED = 'approval.request.created';
+
+    public const APPROVAL_REQUEST_APPROVED = 'approval.request.approved';
+
+    public const APPROVAL_REQUEST_REJECTED = 'approval.request.rejected';
+
+    public const APPROVAL_REQUEST_CANCELLED = 'approval.request.cancelled';
+
+    public const APPROVAL_STEP_DECIDED = 'approval.step.decided';
+
     /**
      * @var list<string>
      */

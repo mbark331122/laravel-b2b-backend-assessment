@@ -213,6 +213,16 @@ class Permission extends Model
 
     public const COMPANY_INVITATION_MANAGE = 'company.invitation.manage';
 
+    public const APPROVAL_POLICY_READ = 'approval.policy.read';
+
+    public const APPROVAL_POLICY_MANAGE = 'approval.policy.manage';
+
+    public const APPROVAL_REQUEST_READ = 'approval.request.read';
+
+    public const APPROVAL_REQUEST_DECIDE = 'approval.request.decide';
+
+    public const APPROVAL_REQUEST_CANCEL = 'approval.request.cancel';
+
     /**
      * Platform permission catalog.
      *
@@ -326,6 +336,11 @@ class Permission extends Model
             self::COMPANY_INVITATION_CREATE,
             self::COMPANY_INVITATION_READ,
             self::COMPANY_INVITATION_MANAGE,
+            self::APPROVAL_POLICY_READ,
+            self::APPROVAL_POLICY_MANAGE,
+            self::APPROVAL_REQUEST_READ,
+            self::APPROVAL_REQUEST_DECIDE,
+            self::APPROVAL_REQUEST_CANCEL,
         ];
     }
 
@@ -348,6 +363,22 @@ class Permission extends Model
             self::COMPANY_INVITATION_CREATE,
             self::COMPANY_INVITATION_READ,
             self::COMPANY_INVITATION_MANAGE,
+        ];
+    }
+
+    /**
+     * Approval workflow permissions for tenant members.
+     *
+     * @return list<string>
+     */
+    public static function approvalWorkflowNames(): array
+    {
+        return [
+            self::APPROVAL_POLICY_READ,
+            self::APPROVAL_POLICY_MANAGE,
+            self::APPROVAL_REQUEST_READ,
+            self::APPROVAL_REQUEST_DECIDE,
+            self::APPROVAL_REQUEST_CANCEL,
         ];
     }
 
@@ -406,6 +437,7 @@ class Permission extends Model
             self::PRODUCT_READ,
             self::SUPPLIER_PROFILE_READ,
             ...self::companyOnboardingNames(),
+            ...self::approvalWorkflowNames(),
         ];
     }
 
@@ -479,6 +511,7 @@ class Permission extends Model
             self::REFUND_FAIL,
             self::REFUND_CANCEL,
             ...self::companyOnboardingNames(),
+            ...self::approvalWorkflowNames(),
         ];
     }
 
@@ -495,6 +528,7 @@ class Permission extends Model
             self::PURCHASE_ORDER_PARTY_IDENTITY_READ,
             self::PURCHASE_ORDER_COMMISSION_READ,
             ...self::companyOnboardingNames(),
+            ...self::approvalWorkflowNames(),
         ];
     }
 

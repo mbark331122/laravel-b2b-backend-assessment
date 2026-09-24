@@ -6,9 +6,11 @@ use App\Http\Controllers\Concerns\OptionallyPaginates;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\RejectPurchaseOrderRequest;
 use App\Http\Requests\StorePurchaseOrderRequest;
+use App\Models\ApprovalPolicy;
 use App\Models\AuditLog;
 use App\Models\Negotiation;
 use App\Models\PurchaseOrder;
+use App\Services\ApprovalWorkflowService;
 use App\Services\AuditLogger;
 use App\Services\PurchaseOrderService;
 use App\Services\TransactionVisibilityService;
@@ -126,10 +128,26 @@ class PurchaseOrderController extends Controller
         PurchaseOrder $purchaseOrder,
         PurchaseOrderService $purchaseOrders,
         TransactionVisibilityService $visibility,
+        ApprovalWorkflowService $approvals,
     ): JsonResponse {
         Gate::authorize('submit', $purchaseOrder);
 
         $user = $request->user();
+
+        $blocked = $approvals->gateOrCreate(
+            $user,
+            ApprovalPolicy::TYPE_PURCHASE_ORDER_SUBMIT,
+            $purchaseOrder,
+            $approvals->contextForPurchaseOrder($purchaseOrder),
+        );
+
+        if ($blocked !== null) {
+            return response()->json([
+                'message' => 'Approval is required before this purchase order can be submitted.',
+                'approval_request' => $blocked->toApiArray(),
+            ], 422);
+        }
+
         $before = $purchaseOrder->toApiArray();
         $po = $purchaseOrders->submit($purchaseOrder);
 

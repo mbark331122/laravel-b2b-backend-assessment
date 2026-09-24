@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Api\AiExtractionController;
+use App\Http\Controllers\Api\ApprovalPolicyController;
+use App\Http\Controllers\Api\ApprovalRequestController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BankChangeRequestController;
 use App\Http\Controllers\Api\BrandController;
@@ -69,6 +71,20 @@ Route::middleware(['auth:sanctum', 'active.company'])->group(function () {
     Route::post('/company/invitations', [CompanyInvitationController::class, 'store']);
     Route::get('/company/invitations/{companyInvitation}', [CompanyInvitationController::class, 'show']);
     Route::post('/company/invitations/{companyInvitation}/revoke', [CompanyInvitationController::class, 'revoke']);
+
+    Route::get('/approval-policies', [ApprovalPolicyController::class, 'index']);
+    Route::post('/approval-policies', [ApprovalPolicyController::class, 'store']);
+    Route::get('/approval-policies/{approvalPolicy}', [ApprovalPolicyController::class, 'show']);
+    Route::put('/approval-policies/{approvalPolicy}', [ApprovalPolicyController::class, 'update']);
+    Route::patch('/approval-policies/{approvalPolicy}', [ApprovalPolicyController::class, 'update']);
+    Route::post('/approval-policies/{approvalPolicy}/activate', [ApprovalPolicyController::class, 'activate']);
+    Route::post('/approval-policies/{approvalPolicy}/deactivate', [ApprovalPolicyController::class, 'deactivate']);
+
+    Route::get('/approval-requests', [ApprovalRequestController::class, 'index']);
+    Route::get('/approval-requests/{approvalRequest}', [ApprovalRequestController::class, 'show']);
+    Route::post('/approval-requests/{approvalRequest}/approve', [ApprovalRequestController::class, 'approve']);
+    Route::post('/approval-requests/{approvalRequest}/reject', [ApprovalRequestController::class, 'reject']);
+    Route::post('/approval-requests/{approvalRequest}/cancel', [ApprovalRequestController::class, 'cancel']);
 
     Route::apiResource('rfqs', RfqController::class);
     Route::post('/rfqs/{rfq}/submit', [RfqController::class, 'submit']);

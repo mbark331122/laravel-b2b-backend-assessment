@@ -6,8 +6,10 @@ use App\Http\Controllers\Concerns\OptionallyPaginates;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreRfqRequest;
 use App\Http\Requests\UpdateRfqRequest;
+use App\Models\ApprovalPolicy;
 use App\Models\AuditLog;
 use App\Models\Rfq;
+use App\Services\ApprovalWorkflowService;
 use App\Services\AuditLogger;
 use App\Services\RfqService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -133,8 +135,24 @@ class RfqController extends Controller
         ]);
     }
 
-    public function submit(Request $request, Rfq $rfq): JsonResponse
+    public function submit(Request $request, Rfq $rfq, ApprovalWorkflowService $approvals): JsonResponse
     {
+        $this->authorize('submit', $rfq);
+
+        $blocked = $approvals->gateOrCreate(
+            $request->user(),
+            ApprovalPolicy::TYPE_RFQ_SUBMIT,
+            $rfq,
+            $approvals->contextForRfq($rfq),
+        );
+
+        if ($blocked !== null) {
+            return response()->json([
+                'message' => 'Approval is required before this RFQ can be submitted.',
+                'approval_request' => $blocked->toApiArray(),
+            ], 422);
+        }
+
         return $this->transition($request, $rfq, 'submit', Rfq::STATUS_SUBMITTED, AuditLog::RFQ_SUBMITTED);
     }
 
