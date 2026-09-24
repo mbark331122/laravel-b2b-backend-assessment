@@ -39,25 +39,39 @@ class TransactionVisibilityService
      * Mutual identity grants are applied only when both core parties are newly created
      * and $grantMutualIdentity is true (classic direct trade). Later calls never escalate visibility.
      *
+     * @param  bool  $lock  When false (read/serialize path), skip row locks if parties already exist.
      * @return array{buyer: PurchaseOrderParty, supplier: PurchaseOrderParty}
      */
-    public function ensureCoreParties(PurchaseOrder $purchaseOrder, bool $grantMutualIdentity = false): array
-    {
-        return DB::transaction(function () use ($purchaseOrder, $grantMutualIdentity) {
+    public function ensureCoreParties(
+        PurchaseOrder $purchaseOrder,
+        bool $grantMutualIdentity = false,
+        bool $lock = true,
+    ): array {
+        if (! $lock) {
+            $existing = $this->existingCoreParties($purchaseOrder);
+            if ($existing !== null) {
+                return $existing;
+            }
+        }
+
+        return DB::transaction(function () use ($purchaseOrder, $grantMutualIdentity, $lock) {
             /** @var PurchaseOrder $locked */
-            $locked = PurchaseOrder::query()->whereKey($purchaseOrder->id)->lockForUpdate()->firstOrFail();
+            $query = PurchaseOrder::query()->whereKey($purchaseOrder->id);
+            $locked = ($lock ? $query->lockForUpdate() : $query)->firstOrFail();
 
             [$buyer, $buyerCreated] = $this->findOrCreateParty(
                 $locked,
                 (int) $locked->buyer_company_id,
                 PurchaseOrderParty::ROLE_BUYER,
                 0,
+                $lock,
             );
             [$supplier, $supplierCreated] = $this->findOrCreateParty(
                 $locked,
                 (int) $locked->supplier_company_id,
                 PurchaseOrderParty::ROLE_SUPPLIER,
                 0,
+                $lock,
             );
 
             if ($grantMutualIdentity && $buyerCreated && $supplierCreated) {
@@ -73,6 +87,13 @@ class TransactionVisibilityService
     {
         if ($user->company_id === null) {
             return null;
+        }
+
+        if ($purchaseOrder->relationLoaded('parties')) {
+            return $purchaseOrder->parties->first(
+                fn (PurchaseOrderParty $party) => (int) $party->company_id === (int) $user->company_id
+                    && $party->status === PurchaseOrderParty::STATUS_ACTIVE
+            );
         }
 
         return PurchaseOrderParty::query()
@@ -195,7 +216,8 @@ class TransactionVisibilityService
      */
     public function serializePurchaseOrder(User $user, PurchaseOrder $purchaseOrder): array
     {
-        $this->ensureCoreParties($purchaseOrder);
+        // Read path: avoid lockForUpdate when core parties already exist.
+        $this->ensureCoreParties($purchaseOrder, grantMutualIdentity: false, lock: false);
 
         $base = [
             'id' => $purchaseOrder->id,
@@ -210,16 +232,8 @@ class TransactionVisibilityService
             'visibility_category' => self::CATEGORY_PUBLIC_TO_TRANSACTION,
         ];
 
-        $buyerParty = PurchaseOrderParty::query()
-            ->where('purchase_order_id', $purchaseOrder->id)
-            ->where('role', PurchaseOrderParty::ROLE_BUYER)
-            ->where('status', PurchaseOrderParty::STATUS_ACTIVE)
-            ->first();
-        $supplierParty = PurchaseOrderParty::query()
-            ->where('purchase_order_id', $purchaseOrder->id)
-            ->where('role', PurchaseOrderParty::ROLE_SUPPLIER)
-            ->where('status', PurchaseOrderParty::STATUS_ACTIVE)
-            ->first();
+        $buyerParty = $this->resolveCoreParty($purchaseOrder, PurchaseOrderParty::ROLE_BUYER);
+        $supplierParty = $this->resolveCoreParty($purchaseOrder, PurchaseOrderParty::ROLE_SUPPLIER);
 
         $base['buyer_company'] = ($buyerParty && $this->canViewPartyIdentity($user, $purchaseOrder, $buyerParty))
             ? ['id' => $purchaseOrder->buyer_company_id, 'name' => $purchaseOrder->buyerCompany?->name]
@@ -350,7 +364,7 @@ class TransactionVisibilityService
      */
     public function exportRepresentation(User $user, PurchaseOrder $purchaseOrder): array
     {
-        $this->ensureCoreParties($purchaseOrder);
+        $this->ensureCoreParties($purchaseOrder, grantMutualIdentity: false, lock: false);
 
         $parties = PurchaseOrderParty::query()
             ->where('purchase_order_id', $purchaseOrder->id)
@@ -408,7 +422,7 @@ class TransactionVisibilityService
      */
     public function searchParties(User $user, PurchaseOrder $purchaseOrder, ?string $query): array
     {
-        $this->ensureCoreParties($purchaseOrder);
+        $this->ensureCoreParties($purchaseOrder, grantMutualIdentity: false, lock: false);
 
         $parties = PurchaseOrderParty::query()
             ->where('purchase_order_id', $purchaseOrder->id)
@@ -621,6 +635,37 @@ class TransactionVisibilityService
     }
 
     /**
+     * @return array{buyer: PurchaseOrderParty, supplier: PurchaseOrderParty}|null
+     */
+    private function existingCoreParties(PurchaseOrder $purchaseOrder): ?array
+    {
+        $buyer = $this->resolveCoreParty($purchaseOrder, PurchaseOrderParty::ROLE_BUYER);
+        $supplier = $this->resolveCoreParty($purchaseOrder, PurchaseOrderParty::ROLE_SUPPLIER);
+
+        if ($buyer === null || $supplier === null) {
+            return null;
+        }
+
+        return ['buyer' => $buyer, 'supplier' => $supplier];
+    }
+
+    private function resolveCoreParty(PurchaseOrder $purchaseOrder, string $role): ?PurchaseOrderParty
+    {
+        if ($purchaseOrder->relationLoaded('parties')) {
+            return $purchaseOrder->parties->first(
+                fn (PurchaseOrderParty $party) => $party->role === $role
+                    && $party->status === PurchaseOrderParty::STATUS_ACTIVE
+            );
+        }
+
+        return PurchaseOrderParty::query()
+            ->where('purchase_order_id', $purchaseOrder->id)
+            ->where('role', $role)
+            ->where('status', PurchaseOrderParty::STATUS_ACTIVE)
+            ->first();
+    }
+
+    /**
      * @return array{0: PurchaseOrderParty, 1: bool}
      */
     private function findOrCreateParty(
@@ -628,12 +673,17 @@ class TransactionVisibilityService
         int $companyId,
         string $role,
         int $sequence,
+        bool $lock = true,
     ): array {
-        $party = PurchaseOrderParty::query()
+        $query = PurchaseOrderParty::query()
             ->where('purchase_order_id', $purchaseOrder->id)
-            ->where('company_id', $companyId)
-            ->lockForUpdate()
-            ->first();
+            ->where('company_id', $companyId);
+
+        if ($lock) {
+            $query->lockForUpdate();
+        }
+
+        $party = $query->first();
 
         if ($party) {
             if ($party->status !== PurchaseOrderParty::STATUS_ACTIVE) {

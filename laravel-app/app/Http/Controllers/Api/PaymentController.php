@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\OptionallyPaginates;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePaymentRequest;
 use App\Models\AuditLog;
@@ -17,6 +18,7 @@ use Illuminate\Support\Facades\Gate;
 class PaymentController extends Controller
 {
     use AuthorizesRequests;
+    use OptionallyPaginates;
 
     public function index(Request $request): JsonResponse
     {
@@ -32,9 +34,12 @@ class PaymentController extends Controller
             $query->where('buyer_company_id', $user->company_id);
         }
 
-        return response()->json([
-            'payments' => $query->get()->map(fn (Payment $payment) => $payment->toApiArray())->values(),
-        ]);
+        return $this->optionallyPaginate(
+            $query,
+            $request,
+            'payments',
+            fn (Payment $payment) => $payment->toApiArray(),
+        );
     }
 
     public function indexForSupplier(Request $request): JsonResponse

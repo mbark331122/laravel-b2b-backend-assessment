@@ -18,39 +18,47 @@ class QuotationService
      */
     public function createForDistribution(RfqDistribution $distribution, int $supplierCompanyId, array $payload): Quotation
     {
-        $this->assertDistributionEligibleForCreate($distribution, $supplierCompanyId);
-
-        Quotation::query()
-            ->where('rfq_distribution_id', $distribution->id)
-            ->where('status', Quotation::STATUS_SUBMITTED)
-            ->get()
-            ->each(fn (Quotation $quotation) => $quotation->refreshExpiration());
-
-        $existingActive = Quotation::query()
-            ->where('rfq_distribution_id', $distribution->id)
-            ->whereIn('status', [Quotation::STATUS_DRAFT, Quotation::STATUS_SUBMITTED])
-            ->exists();
-
-        if ($existingActive) {
-            throw ValidationException::withMessages([
-                'quotation' => 'An active quotation already exists for this distribution.',
-            ]);
-        }
-
         return DB::transaction(function () use ($distribution, $supplierCompanyId, $payload) {
+            /** @var RfqDistribution $lockedDistribution */
+            $lockedDistribution = RfqDistribution::query()
+                ->whereKey($distribution->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $this->assertDistributionEligibleForCreate($lockedDistribution, $supplierCompanyId);
+
+            Quotation::query()
+                ->where('rfq_distribution_id', $lockedDistribution->id)
+                ->where('status', Quotation::STATUS_SUBMITTED)
+                ->lockForUpdate()
+                ->get()
+                ->each(fn (Quotation $quotation) => $quotation->refreshExpiration());
+
+            $existingActive = Quotation::query()
+                ->where('rfq_distribution_id', $lockedDistribution->id)
+                ->whereIn('status', [Quotation::STATUS_DRAFT, Quotation::STATUS_SUBMITTED])
+                ->lockForUpdate()
+                ->exists();
+
+            if ($existingActive) {
+                throw ValidationException::withMessages([
+                    'quotation' => 'An active quotation already exists for this distribution.',
+                ]);
+            }
+
             $quotation = new Quotation;
-            $quotation->rfq()->associate($distribution->rfq);
-            $quotation->distribution()->associate($distribution);
+            $quotation->rfq()->associate($lockedDistribution->rfq);
+            $quotation->distribution()->associate($lockedDistribution);
             $quotation->supplier_company_id = $supplierCompanyId;
             $quotation->status = Quotation::STATUS_DRAFT;
-            $quotation->currency = strtoupper((string) ($payload['currency'] ?? $distribution->rfq->currency ?? 'USD'));
+            $quotation->currency = strtoupper((string) ($payload['currency'] ?? $lockedDistribution->rfq->currency ?? 'USD'));
             $quotation->valid_until = $payload['valid_until'] ?? null;
             $quotation->notes = $payload['notes'] ?? null;
             $quotation->shipping_amount = $this->money($payload['shipping_amount'] ?? 0);
             $quotation->tax_amount = $this->money($payload['tax_amount'] ?? 0);
             $quotation->subtotal = '0.00';
             $quotation->total = '0.00';
-            $quotation->active_lock = $distribution->id;
+            $quotation->active_lock = $lockedDistribution->id;
             $quotation->save();
 
             foreach ($payload['items'] ?? [] as $itemPayload) {

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\OptionallyPaginates;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreCreditNoteRequest;
 use App\Http\Requests\VoidCreditNoteRequest;
@@ -18,6 +19,7 @@ use Illuminate\Support\Facades\Gate;
 class CreditNoteController extends Controller
 {
     use AuthorizesRequests;
+    use OptionallyPaginates;
 
     public function index(Request $request): JsonResponse
     {
@@ -40,9 +42,12 @@ class CreditNoteController extends Controller
             $query->where('buyer_company_id', $user->company_id);
         }
 
-        return response()->json([
-            'credit_notes' => $query->get()->map(fn (CreditNote $creditNote) => $creditNote->toApiArray())->values(),
-        ]);
+        return $this->optionallyPaginate(
+            $query,
+            $request,
+            'credit_notes',
+            fn (CreditNote $creditNote) => $creditNote->toApiArray(),
+        );
     }
 
     public function indexForSupplier(Request $request): JsonResponse

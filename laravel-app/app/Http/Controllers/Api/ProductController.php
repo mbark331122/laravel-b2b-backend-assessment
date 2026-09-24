@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\OptionallyPaginates;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreProductRequest;
 use App\Http\Requests\TransitionProductRequest;
@@ -17,6 +18,7 @@ use InvalidArgumentException;
 class ProductController extends Controller
 {
     use AuthorizesRequests;
+    use OptionallyPaginates;
 
     public function index(Request $request): JsonResponse
     {
@@ -40,19 +42,19 @@ class ProductController extends Controller
             unset($filters['status']);
         }
 
-        $products = Product::query()
+        $query = Product::query()
             ->with(['category', 'supplierProfile', 'brand', 'specifications', 'priceTiers'])
             ->visibleTo($user)
             ->applyCatalogFilters($filters)
             ->orderBy('name')
-            ->orderBy('id')
-            ->get()
-            ->map(fn (Product $product) => $product->toApiArray())
-            ->values();
+            ->orderBy('id');
 
-        return response()->json([
-            'products' => $products,
-        ]);
+        return $this->optionallyPaginate(
+            $query,
+            $request,
+            'products',
+            fn (Product $product) => $product->toApiArray(),
+        );
     }
 
     public function store(StoreProductRequest $request): JsonResponse

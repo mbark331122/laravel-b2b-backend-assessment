@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\OptionallyPaginates;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreShipmentRequest;
 use App\Http\Requests\UpdateShipmentRequest;
@@ -18,6 +19,7 @@ use Illuminate\Support\Facades\Gate;
 class ShipmentController extends Controller
 {
     use AuthorizesRequests;
+    use OptionallyPaginates;
 
     public function index(Request $request): JsonResponse
     {
@@ -33,9 +35,12 @@ class ShipmentController extends Controller
             $query->where('buyer_company_id', $user->company_id);
         }
 
-        return response()->json([
-            'shipments' => $query->get()->map(fn (Shipment $shipment) => $shipment->toApiArray())->values(),
-        ]);
+        return $this->optionallyPaginate(
+            $query,
+            $request,
+            'shipments',
+            fn (Shipment $shipment) => $shipment->toApiArray(),
+        );
     }
 
     public function indexForSupplier(Request $request): JsonResponse

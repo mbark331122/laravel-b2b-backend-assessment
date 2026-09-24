@@ -33,11 +33,12 @@ class MultiPartyConfidentialityController extends Controller
         Gate::authorize('viewAny', [PurchaseOrderParty::class, $purchaseOrder]);
 
         // Ignore include/confidential query probes — never expand payload from client hints.
-        $visibility->ensureCoreParties($purchaseOrder);
+        $visibility->ensureCoreParties($purchaseOrder, grantMutualIdentity: false, lock: false);
 
         $parties = PurchaseOrderParty::query()
             ->where('purchase_order_id', $purchaseOrder->id)
             ->where('status', PurchaseOrderParty::STATUS_ACTIVE)
+            ->with('company')
             ->orderBy('sequence')
             ->orderBy('id')
             ->get()

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\OptionallyPaginates;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreDeliveryConfirmationRequest;
 use App\Models\AuditLog;
@@ -17,6 +18,7 @@ use Illuminate\Support\Facades\Gate;
 class DeliveryConfirmationController extends Controller
 {
     use AuthorizesRequests;
+    use OptionallyPaginates;
 
     public function index(Request $request): JsonResponse
     {
@@ -38,11 +40,12 @@ class DeliveryConfirmationController extends Controller
             $query->where('buyer_company_id', $user->company_id);
         }
 
-        return response()->json([
-            'delivery_confirmations' => $query->get()
-                ->map(fn (DeliveryConfirmation $confirmation) => $confirmation->toApiArray())
-                ->values(),
-        ]);
+        return $this->optionallyPaginate(
+            $query,
+            $request,
+            'delivery_confirmations',
+            fn (DeliveryConfirmation $confirmation) => $confirmation->toApiArray(),
+        );
     }
 
     public function indexForSupplier(Request $request): JsonResponse

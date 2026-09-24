@@ -147,9 +147,19 @@ class Negotiation extends Model
             return false;
         }
 
+        $beforeStatus = $this->status;
+
         $this->status = self::STATUS_EXPIRED;
         $this->active_lock = null;
         $this->save();
+
+        app(\App\Services\AuditLogger::class)->record(
+            \App\Models\AuditLog::NEGOTIATION_EXPIRED,
+            $this,
+            $this->buyer_company_id,
+            before: ['status' => $beforeStatus],
+            after: ['status' => self::STATUS_EXPIRED],
+        );
 
         return true;
     }

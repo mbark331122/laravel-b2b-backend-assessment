@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\OptionallyPaginates;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreInvoiceRequest;
 use App\Http\Requests\VoidInvoiceRequest;
@@ -18,6 +19,7 @@ use Illuminate\Support\Facades\Gate;
 class InvoiceController extends Controller
 {
     use AuthorizesRequests;
+    use OptionallyPaginates;
 
     public function index(Request $request): JsonResponse
     {
@@ -33,9 +35,12 @@ class InvoiceController extends Controller
             $query->where('buyer_company_id', $user->company_id);
         }
 
-        return response()->json([
-            'invoices' => $query->get()->map(fn (Invoice $invoice) => $invoice->toApiArray())->values(),
-        ]);
+        return $this->optionallyPaginate(
+            $query,
+            $request,
+            'invoices',
+            fn (Invoice $invoice) => $invoice->toApiArray(),
+        );
     }
 
     public function indexForSupplier(Request $request): JsonResponse

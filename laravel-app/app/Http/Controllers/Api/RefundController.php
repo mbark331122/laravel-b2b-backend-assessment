@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\OptionallyPaginates;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreRefundRequest;
 use App\Models\AuditLog;
@@ -17,6 +18,7 @@ use Illuminate\Support\Facades\Gate;
 class RefundController extends Controller
 {
     use AuthorizesRequests;
+    use OptionallyPaginates;
 
     public function index(Request $request): JsonResponse
     {
@@ -38,9 +40,12 @@ class RefundController extends Controller
             $query->where('buyer_company_id', $user->company_id);
         }
 
-        return response()->json([
-            'refunds' => $query->get()->map(fn (Refund $refund) => $refund->toApiArray())->values(),
-        ]);
+        return $this->optionallyPaginate(
+            $query,
+            $request,
+            'refunds',
+            fn (Refund $refund) => $refund->toApiArray(),
+        );
     }
 
     public function indexForSupplier(Request $request): JsonResponse

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\OptionallyPaginates;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\RejectPurchaseOrderRequest;
 use App\Http\Requests\StorePurchaseOrderRequest;
@@ -19,6 +20,7 @@ use Illuminate\Support\Facades\Gate;
 class PurchaseOrderController extends Controller
 {
     use AuthorizesRequests;
+    use OptionallyPaginates;
 
     public function index(Request $request): JsonResponse
     {
@@ -27,7 +29,7 @@ class PurchaseOrderController extends Controller
         $user = $request->user();
         $visibility = app(TransactionVisibilityService::class);
         $query = PurchaseOrder::query()
-            ->with(['items', 'buyerCompany', 'supplierCompany.supplierProfile'])
+            ->with(['items', 'buyerCompany', 'supplierCompany.supplierProfile', 'parties.company'])
             ->visibleTo($user)
             ->orderByDesc('id');
 
@@ -37,13 +39,12 @@ class PurchaseOrderController extends Controller
             $query->where('buyer_company_id', $user->company_id);
         }
 
-        $orders = $query->get()
-            ->map(fn (PurchaseOrder $po) => $visibility->serializePurchaseOrder($user, $po))
-            ->values();
-
-        return response()->json([
-            'purchase_orders' => $orders,
-        ]);
+        return $this->optionallyPaginate(
+            $query,
+            $request,
+            'purchase_orders',
+            fn (PurchaseOrder $po) => $visibility->serializePurchaseOrder($user, $po),
+        );
     }
 
     public function indexForSupplier(Request $request): JsonResponse
@@ -57,8 +58,8 @@ class PurchaseOrderController extends Controller
 
         $visibility = app(TransactionVisibilityService::class);
 
-        $orders = PurchaseOrder::query()
-            ->with(['items', 'buyerCompany', 'supplierCompany.supplierProfile'])
+        $query = PurchaseOrder::query()
+            ->with(['items', 'buyerCompany', 'supplierCompany.supplierProfile', 'parties.company'])
             ->where('supplier_company_id', $user->company_id)
             ->whereIn('status', [
                 PurchaseOrder::STATUS_PENDING_SUPPLIER_CONFIRMATION,
@@ -67,14 +68,14 @@ class PurchaseOrderController extends Controller
                 PurchaseOrder::STATUS_CANCELLED,
                 PurchaseOrder::STATUS_COMPLETED,
             ])
-            ->orderByDesc('id')
-            ->get()
-            ->map(fn (PurchaseOrder $po) => $visibility->serializePurchaseOrder($user, $po))
-            ->values();
+            ->orderByDesc('id');
 
-        return response()->json([
-            'purchase_orders' => $orders,
-        ]);
+        return $this->optionallyPaginate(
+            $query,
+            $request,
+            'purchase_orders',
+            fn (PurchaseOrder $po) => $visibility->serializePurchaseOrder($user, $po),
+        );
     }
 
     public function show(Request $request, PurchaseOrder $purchaseOrder): JsonResponse
@@ -85,6 +86,7 @@ class PurchaseOrderController extends Controller
             'items',
             'buyerCompany',
             'supplierCompany.supplierProfile',
+            'parties.company',
         ]);
 
         return response()->json([

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\OptionallyPaginates;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\RejectRmaRequest;
 use App\Http\Requests\StoreRmaRequest;
@@ -18,6 +19,7 @@ use Illuminate\Support\Facades\Gate;
 class RmaController extends Controller
 {
     use AuthorizesRequests;
+    use OptionallyPaginates;
 
     public function index(Request $request): JsonResponse
     {
@@ -41,9 +43,12 @@ class RmaController extends Controller
             $query->where('buyer_company_id', $user->company_id);
         }
 
-        return response()->json([
-            'rmas' => $query->get()->map(fn (Rma $rma) => $rma->toApiArray())->values(),
-        ]);
+        return $this->optionallyPaginate(
+            $query,
+            $request,
+            'rmas',
+            fn (Rma $rma) => $rma->toApiArray(),
+        );
     }
 
     public function indexForSupplier(Request $request): JsonResponse

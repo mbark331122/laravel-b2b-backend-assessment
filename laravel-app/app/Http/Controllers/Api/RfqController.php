@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\OptionallyPaginates;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreRfqRequest;
 use App\Http\Requests\UpdateRfqRequest;
@@ -17,6 +18,7 @@ use InvalidArgumentException;
 class RfqController extends Controller
 {
     use AuthorizesRequests;
+    use OptionallyPaginates;
 
     public function index(Request $request): JsonResponse
     {
@@ -30,18 +32,18 @@ class RfqController extends Controller
             'updated_to',
         ]);
 
-        $rfqs = Rfq::query()
+        $query = Rfq::query()
             ->with('items')
             ->visibleTo($request->user())
             ->applyFilters($filters)
-            ->latest('id')
-            ->get()
-            ->map(fn (Rfq $rfq) => $rfq->toApiArray())
-            ->values();
+            ->latest('id');
 
-        return response()->json([
-            'rfqs' => $rfqs,
-        ]);
+        return $this->optionallyPaginate(
+            $query,
+            $request,
+            'rfqs',
+            fn (Rfq $rfq) => $rfq->toApiArray(),
+        );
     }
 
     public function store(StoreRfqRequest $request, RfqService $rfqService): JsonResponse
