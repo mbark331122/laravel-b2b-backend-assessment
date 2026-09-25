@@ -9,6 +9,7 @@ use App\Models\Rfq;
 use App\Models\RfqDistribution;
 use App\Models\SupplierProfile;
 use App\Services\AuditLogger;
+use App\Services\DomainNotificationPublisher;
 use App\Services\SupplierMatchingService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
@@ -66,6 +67,8 @@ class RfqDistributionController extends Controller
                 $rfq->company_id,
                 after: $distribution->toApiArray(),
             );
+
+            app(DomainNotificationPublisher::class)->rfqDistributed($rfq, $distribution);
         }
 
         return response()->json([

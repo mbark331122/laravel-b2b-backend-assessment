@@ -9,6 +9,7 @@ use App\Models\AuditLog;
 use App\Models\CreditNote;
 use App\Models\Refund;
 use App\Services\AuditLogger;
+use App\Services\DomainNotificationPublisher;
 use App\Services\RefundService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
@@ -136,6 +137,8 @@ class RefundController extends Controller
             reason: $request->input('reason'),
         );
 
+        app(DomainNotificationPublisher::class)->refundProcessed($refund);
+
         return response()->json([
             'refund' => $refund->toApiArray(),
         ]);
@@ -157,6 +160,8 @@ class RefundController extends Controller
             reason: $request->input('reason'),
         );
 
+        app(DomainNotificationPublisher::class)->refundFailed($refund);
+
         return response()->json([
             'refund' => $refund->toApiArray(),
         ]);
@@ -177,6 +182,8 @@ class RefundController extends Controller
             after: $refund->toApiArray(),
             reason: $request->input('reason'),
         );
+
+        app(DomainNotificationPublisher::class)->refundCancelled($refund);
 
         return response()->json([
             'refund' => $refund->toApiArray(),

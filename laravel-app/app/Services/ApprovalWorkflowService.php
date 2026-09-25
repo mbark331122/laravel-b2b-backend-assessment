@@ -235,9 +235,13 @@ class ApprovalWorkflowService
                     $locked->company_id,
                     after: $locked->fresh('decisions')->toApiArray(),
                 );
+
+                app(DomainNotificationPublisher::class)->approvalRequestApproved($locked);
             } else {
                 $locked->current_step_order = (int) $locked->current_step_order + 1;
                 $locked->save();
+
+                app(DomainNotificationPublisher::class)->approvalStepAdvanced($locked);
             }
 
             return $locked->fresh('decisions');
@@ -295,6 +299,8 @@ class ApprovalWorkflowService
                 reason: $reason,
             );
 
+            app(DomainNotificationPublisher::class)->approvalRequestRejected($locked);
+
             return $locked->fresh('decisions');
         });
     }
@@ -326,6 +332,8 @@ class ApprovalWorkflowService
                 before: $before,
                 after: $locked->fresh('decisions')->toApiArray(),
             );
+
+            app(DomainNotificationPublisher::class)->approvalRequestCancelled($locked);
 
             return $locked->fresh('decisions');
         });
@@ -484,6 +492,8 @@ class ApprovalWorkflowService
             $company->id,
             after: $request->fresh('decisions')->toApiArray(),
         );
+
+        app(DomainNotificationPublisher::class)->approvalRequestCreated($request);
 
         return $request->fresh('decisions');
     }

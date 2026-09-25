@@ -10,6 +10,7 @@ use App\Models\DeliveryConfirmation;
 use App\Models\Shipment;
 use App\Services\AuditLogger;
 use App\Services\DeliveryConfirmationService;
+use App\Services\DomainNotificationPublisher;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -131,6 +132,8 @@ class DeliveryConfirmationController extends Controller
                 $confirmation->buyer_company_id,
                 after: $confirmation->toApiArray(),
             );
+
+            app(DomainNotificationPublisher::class)->deliveryConfirmationCreated($confirmation);
         }
 
         return response()->json([

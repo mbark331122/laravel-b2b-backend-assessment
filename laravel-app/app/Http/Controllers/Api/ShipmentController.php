@@ -10,6 +10,7 @@ use App\Models\AuditLog;
 use App\Models\PurchaseOrder;
 use App\Models\Shipment;
 use App\Services\AuditLogger;
+use App\Services\DomainNotificationPublisher;
 use App\Services\ShipmentService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
@@ -118,6 +119,8 @@ class ShipmentController extends Controller
                 $shipment->supplier_company_id,
                 after: $shipment->toApiArray(),
             );
+
+            app(DomainNotificationPublisher::class)->shipmentCreated($shipment);
         }
 
         return response()->json([
@@ -185,6 +188,8 @@ class ShipmentController extends Controller
             reason: $request->input('reason'),
         );
 
+        app(DomainNotificationPublisher::class)->shipmentShipped($shipment);
+
         return response()->json([
             'shipment' => $shipment->toApiArray(),
         ]);
@@ -206,6 +211,8 @@ class ShipmentController extends Controller
             reason: $request->input('reason'),
         );
 
+        app(DomainNotificationPublisher::class)->shipmentDelivered($shipment);
+
         return response()->json([
             'shipment' => $shipment->toApiArray(),
         ]);
@@ -226,6 +233,8 @@ class ShipmentController extends Controller
             after: $shipment->toApiArray(),
             reason: $request->input('reason'),
         );
+
+        app(DomainNotificationPublisher::class)->shipmentCancelled($shipment);
 
         return response()->json([
             'shipment' => $shipment->toApiArray(),

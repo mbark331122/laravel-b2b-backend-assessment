@@ -11,6 +11,7 @@ use App\Models\CreditNote;
 use App\Models\Rma;
 use App\Services\AuditLogger;
 use App\Services\CreditNoteService;
+use App\Services\DomainNotificationPublisher;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -159,6 +160,8 @@ class CreditNoteController extends Controller
             reason: $request->input('reason'),
         );
 
+        app(DomainNotificationPublisher::class)->creditNoteIssued($creditNote);
+
         return response()->json([
             'credit_note' => $creditNote->toApiArray(),
         ]);
@@ -180,6 +183,8 @@ class CreditNoteController extends Controller
             reason: $request->input('reason'),
         );
 
+        app(DomainNotificationPublisher::class)->creditNoteCancelled($creditNote);
+
         return response()->json([
             'credit_note' => $creditNote->toApiArray(),
         ]);
@@ -200,6 +205,8 @@ class CreditNoteController extends Controller
             after: $creditNote->toApiArray(),
             reason: $request->validated('reason'),
         );
+
+        app(DomainNotificationPublisher::class)->creditNoteVoided($creditNote);
 
         return response()->json([
             'credit_note' => $creditNote->toApiArray(),

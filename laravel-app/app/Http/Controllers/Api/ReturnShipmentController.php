@@ -9,6 +9,7 @@ use App\Models\AuditLog;
 use App\Models\ReturnShipment;
 use App\Models\Rma;
 use App\Services\AuditLogger;
+use App\Services\DomainNotificationPublisher;
 use App\Services\ReturnShipmentService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
@@ -142,6 +143,8 @@ class ReturnShipmentController extends Controller
                 $returnShipment->buyer_company_id,
                 after: $returnShipment->toApiArray(),
             );
+
+            app(DomainNotificationPublisher::class)->returnShipmentCreated($returnShipment);
         }
 
         return response()->json([
@@ -188,6 +191,8 @@ class ReturnShipmentController extends Controller
             reason: $request->input('reason'),
         );
 
+        app(DomainNotificationPublisher::class)->returnShipmentShipped($returnShipment);
+
         return response()->json([
             'return_shipment' => $returnShipment->toApiArray(),
         ]);
@@ -209,6 +214,8 @@ class ReturnShipmentController extends Controller
             reason: $request->input('reason'),
         );
 
+        app(DomainNotificationPublisher::class)->returnShipmentDelivered($returnShipment);
+
         return response()->json([
             'return_shipment' => $returnShipment->toApiArray(),
         ]);
@@ -229,6 +236,8 @@ class ReturnShipmentController extends Controller
             after: $returnShipment->toApiArray(),
             reason: $request->input('reason'),
         );
+
+        app(DomainNotificationPublisher::class)->returnShipmentCancelled($returnShipment);
 
         return response()->json([
             'return_shipment' => $returnShipment->toApiArray(),

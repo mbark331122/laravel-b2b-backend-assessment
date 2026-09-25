@@ -10,6 +10,7 @@ use App\Models\AuditLog;
 use App\Models\Rma;
 use App\Models\Shipment;
 use App\Services\AuditLogger;
+use App\Services\DomainNotificationPublisher;
 use App\Services\RmaService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
@@ -118,6 +119,8 @@ class RmaController extends Controller
             after: $rma->toApiArray(),
         );
 
+        app(DomainNotificationPublisher::class)->rmaCreated($rma);
+
         return response()->json([
             'rma' => $rma->toApiArray(),
         ], 201);
@@ -160,6 +163,8 @@ class RmaController extends Controller
             reason: $request->input('reason'),
         );
 
+        app(DomainNotificationPublisher::class)->rmaApproved($rma);
+
         return response()->json([
             'rma' => $rma->toApiArray(),
         ]);
@@ -180,6 +185,8 @@ class RmaController extends Controller
             after: $rma->toApiArray(),
             reason: $request->validated('rejection_reason'),
         );
+
+        app(DomainNotificationPublisher::class)->rmaRejected($rma);
 
         return response()->json([
             'rma' => $rma->toApiArray(),
@@ -202,6 +209,8 @@ class RmaController extends Controller
             reason: $request->input('reason'),
         );
 
+        app(DomainNotificationPublisher::class)->rmaReceived($rma);
+
         return response()->json([
             'rma' => $rma->toApiArray(),
         ]);
@@ -222,6 +231,8 @@ class RmaController extends Controller
             after: $rma->toApiArray(),
             reason: $request->input('reason'),
         );
+
+        app(DomainNotificationPublisher::class)->rmaClosed($rma);
 
         return response()->json([
             'rma' => $rma->toApiArray(),

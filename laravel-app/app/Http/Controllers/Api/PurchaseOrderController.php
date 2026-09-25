@@ -12,6 +12,7 @@ use App\Models\Negotiation;
 use App\Models\PurchaseOrder;
 use App\Services\ApprovalWorkflowService;
 use App\Services\AuditLogger;
+use App\Services\DomainNotificationPublisher;
 use App\Services\PurchaseOrderService;
 use App\Services\TransactionVisibilityService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -160,6 +161,8 @@ class PurchaseOrderController extends Controller
             reason: $request->input('reason'),
         );
 
+        app(DomainNotificationPublisher::class)->purchaseOrderSubmitted($po);
+
         return response()->json([
             'purchase_order' => $visibility->serializePurchaseOrder($user, $po),
         ]);
@@ -212,6 +215,8 @@ class PurchaseOrderController extends Controller
             reason: $request->input('reason'),
         );
 
+        app(DomainNotificationPublisher::class)->purchaseOrderCompleted($po);
+
         return response()->json([
             'purchase_order' => $visibility->serializePurchaseOrder($user, $po),
         ]);
@@ -238,6 +243,8 @@ class PurchaseOrderController extends Controller
             reason: $request->input('reason'),
         );
 
+        app(DomainNotificationPublisher::class)->purchaseOrderConfirmed($po);
+
         return response()->json([
             'purchase_order' => $visibility->serializePurchaseOrder($user, $po),
         ]);
@@ -263,6 +270,8 @@ class PurchaseOrderController extends Controller
             after: $po->toApiArray(),
             reason: $request->validated('reason'),
         );
+
+        app(DomainNotificationPublisher::class)->purchaseOrderRejected($po);
 
         return response()->json([
             'purchase_order' => $visibility->serializePurchaseOrder($user, $po),

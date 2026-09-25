@@ -11,6 +11,7 @@ use App\Models\AuditLog;
 use App\Models\Rfq;
 use App\Services\ApprovalWorkflowService;
 use App\Services\AuditLogger;
+use App\Services\DomainNotificationPublisher;
 use App\Services\RfqService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
@@ -190,6 +191,10 @@ class RfqController extends Controller
             after: $after,
             reason: $request->input('reason'),
         );
+
+        if ($auditAction === AuditLog::RFQ_SUBMITTED) {
+            app(DomainNotificationPublisher::class)->rfqSubmitted($rfq->fresh());
+        }
 
         return response()->json([
             'rfq' => $after,

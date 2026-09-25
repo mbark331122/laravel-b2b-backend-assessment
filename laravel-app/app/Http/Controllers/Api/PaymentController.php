@@ -9,6 +9,7 @@ use App\Models\AuditLog;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Services\AuditLogger;
+use App\Services\DomainNotificationPublisher;
 use App\Services\PaymentService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
@@ -98,6 +99,8 @@ class PaymentController extends Controller
             after: $payment->toApiArray(),
         );
 
+        app(DomainNotificationPublisher::class)->paymentCreated($payment);
+
         return response()->json([
             'payment' => $payment->toApiArray(),
         ], 201);
@@ -118,6 +121,8 @@ class PaymentController extends Controller
             after: $payment->toApiArray(),
             reason: $request->input('reason'),
         );
+
+        app(DomainNotificationPublisher::class)->paymentMarkedPaid($payment);
 
         return response()->json([
             'payment' => $payment->toApiArray(),
@@ -140,6 +145,8 @@ class PaymentController extends Controller
             reason: $request->input('reason'),
         );
 
+        app(DomainNotificationPublisher::class)->paymentMarkedFailed($payment);
+
         return response()->json([
             'payment' => $payment->toApiArray(),
         ]);
@@ -160,6 +167,8 @@ class PaymentController extends Controller
             after: $payment->toApiArray(),
             reason: $request->input('reason'),
         );
+
+        app(DomainNotificationPublisher::class)->paymentCancelled($payment);
 
         return response()->json([
             'payment' => $payment->toApiArray(),
