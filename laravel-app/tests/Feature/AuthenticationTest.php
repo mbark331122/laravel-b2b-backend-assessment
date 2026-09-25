@@ -30,6 +30,8 @@ class AuthenticationTest extends TestCase
             ->assertJsonPath('user.email', UserSeeder::USER_A_EMAIL)
             ->assertJsonPath('user.name', 'User A')
             ->assertJsonPath('user.is_admin', false)
+            ->assertJsonPath('user.company.is_buyer', true)
+            ->assertJsonPath('user.company.is_supplier', false)
             ->assertJsonStructure(['token', 'user']);
     }
 
@@ -43,6 +45,20 @@ class AuthenticationTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('user.email', UserSeeder::USER_B_EMAIL)
             ->assertJsonPath('user.name', 'User B')
+            ->assertJsonStructure(['token']);
+    }
+
+    public function test_supplier_user_can_authenticate(): void
+    {
+        $response = $this->postJson('/api/login', [
+            'email' => UserSeeder::SUPPLIER_USER_EMAIL,
+            'password' => UserSeeder::PASSWORD,
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('user.email', UserSeeder::SUPPLIER_USER_EMAIL)
+            ->assertJsonPath('user.company.is_buyer', false)
+            ->assertJsonPath('user.company.is_supplier', true)
             ->assertJsonStructure(['token']);
     }
 
