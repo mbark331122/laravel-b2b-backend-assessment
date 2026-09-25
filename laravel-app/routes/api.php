@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\DeliveryConfirmationController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\MultiPartyConfidentialityController;
 use App\Http\Controllers\Api\NegotiationController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
@@ -85,6 +86,11 @@ Route::middleware(['auth:sanctum', 'active.company'])->group(function () {
     Route::post('/approval-requests/{approvalRequest}/approve', [ApprovalRequestController::class, 'approve']);
     Route::post('/approval-requests/{approvalRequest}/reject', [ApprovalRequestController::class, 'reject']);
     Route::post('/approval-requests/{approvalRequest}/cancel', [ApprovalRequestController::class, 'cancel']);
+
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead']);
+    Route::get('/notifications/{notification}', [NotificationController::class, 'show']);
+    Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead']);
 
     Route::apiResource('rfqs', RfqController::class);
     Route::post('/rfqs/{rfq}/submit', [RfqController::class, 'submit']);

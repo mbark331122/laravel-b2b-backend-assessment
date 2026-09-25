@@ -223,6 +223,10 @@ class Permission extends Model
 
     public const APPROVAL_REQUEST_CANCEL = 'approval.request.cancel';
 
+    public const NOTIFICATION_READ = 'notification.read';
+
+    public const NOTIFICATION_MARK_READ = 'notification.mark_read';
+
     /**
      * Platform permission catalog.
      *
@@ -341,6 +345,8 @@ class Permission extends Model
             self::APPROVAL_REQUEST_READ,
             self::APPROVAL_REQUEST_DECIDE,
             self::APPROVAL_REQUEST_CANCEL,
+            self::NOTIFICATION_READ,
+            self::NOTIFICATION_MARK_READ,
         ];
     }
 
@@ -379,6 +385,19 @@ class Permission extends Model
             self::APPROVAL_REQUEST_READ,
             self::APPROVAL_REQUEST_DECIDE,
             self::APPROVAL_REQUEST_CANCEL,
+        ];
+    }
+
+    /**
+     * In-app notification inbox permissions.
+     *
+     * @return list<string>
+     */
+    public static function notificationNames(): array
+    {
+        return [
+            self::NOTIFICATION_READ,
+            self::NOTIFICATION_MARK_READ,
         ];
     }
 
@@ -438,6 +457,7 @@ class Permission extends Model
             self::SUPPLIER_PROFILE_READ,
             ...self::companyOnboardingNames(),
             ...self::approvalWorkflowNames(),
+            ...self::notificationNames(),
         ];
     }
 
@@ -512,6 +532,7 @@ class Permission extends Model
             self::REFUND_CANCEL,
             ...self::companyOnboardingNames(),
             ...self::approvalWorkflowNames(),
+            ...self::notificationNames(),
         ];
     }
 
@@ -529,6 +550,7 @@ class Permission extends Model
             self::PURCHASE_ORDER_COMMISSION_READ,
             ...self::companyOnboardingNames(),
             ...self::approvalWorkflowNames(),
+            ...self::notificationNames(),
         ];
     }
 
