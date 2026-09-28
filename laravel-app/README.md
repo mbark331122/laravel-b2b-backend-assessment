@@ -6,8 +6,31 @@ B2B procurement and supplier commerce API (multi-tenant). Current codebase inclu
 
 There is no frontend. The API is the product.
 
-**Sprint 0 architecture docs:** [`docs/sprint-0/`](docs/sprint-0/)
-**Assessment 2 confidentiality:** [`docs/assessment-2/`](docs/assessment-2/)
+**Application root:** this directory (`laravel-app/`). Repository root has no Composer project — always `cd laravel-app` before install/serve/test.
+
+**Sprint 0 architecture docs:** [`docs/sprint-0/`](docs/sprint-0/)  
+**Assessment 2 confidentiality:** [`docs/assessment-2/`](docs/assessment-2/)  
+**Sprint 17–19 docs:** [`docs/sprint-17/`](docs/sprint-17/), [`docs/sprint-18/`](docs/sprint-18/), [`docs/sprint-19/`](docs/sprint-19/)
+
+### Hosting / accessibility
+
+**No public deployment URL is provided with this Git delivery.** Evaluators run the API locally (or on their own host) using the setup below. Document-root for production-style deploys is `public/` (`public/index.php`).
+
+### Evaluator quick start
+
+```bash
+cd laravel-app
+composer install
+cp .env.example .env          # Windows CMD: copy .env.example .env
+php artisan key:generate
+touch database/database.sqlite
+php artisan migrate:fresh --seed --force
+php artisan serve
+# API: http://127.0.0.1:8000
+# Login: POST /api/login  {"email":"user.a@example.com","password":"password"}
+php artisan route:list
+php artisan test
+```
 
 ## Architecture
 
@@ -63,23 +86,39 @@ Auth (Sanctum)
 
 ## Setup
 
-Requirements: PHP 8.3+, Composer, SQLite (default).
+Requirements:
+
+| Requirement | Notes |
+| --- | --- |
+| **PHP 8.4+** | Locked Symfony/Laravel packages require `>=8.4.1`. PHP 8.3 will fail `composer install`. |
+| Composer | Install dependencies from this directory only |
+| SQLite | **Default** assessment DB — no MySQL/PostgreSQL server required |
+| Extensions | Typical Laravel set (`pdo_sqlite`, `mbstring`, `openssl`, `tokenizer`, `xml`, `ctype`, `json`, `bcmath` / `fileinfo` as provided by your PHP build) |
 
 From this directory (`laravel-app`):
 
 ```bash
 composer install
-copy .env.example .env
+cp .env.example .env          # Windows CMD: copy .env.example .env
 php artisan key:generate
-php artisan migrate --seed
-php artisan serve
+touch database/database.sqlite   # required once; file is gitignored
+php artisan migrate:fresh --seed --force
+php artisan serve                # http://127.0.0.1:8000
 ```
 
-If Composer is not installed globally, use `php ..\composer.phar` from this folder.
+Optional one-shot helper (same directory): `composer run setup` then create the SQLite file and re-run migrate/seed if needed.
+
+If Composer is not installed globally, use the Composer PHAR from the parent folder if present: `php ../composer.phar install`.
+
+**Environment:** Copy `.env.example` → `.env`. Do **not** commit `.env`. Default `DB_CONNECTION=sqlite` uses `database/database.sqlite`. MySQL/PostgreSQL are optional only if you intentionally change `DB_CONNECTION` and related `DB_*` values.
+
+**Fresh evaluation DB:** Prefer `php artisan migrate:fresh --seed --force` so schema + demo users match this README.
 
 Tests use an in-memory SQLite database (`phpunit.xml`). They do not need the file database.
 
 ### Seeded credentials (development only)
+
+These accounts exist after `migrate:fresh --seed`. Password for all seeded users: `password` (local evaluation only — not production secrets).
 
 | User | Email | Password | Company | Classification | Role |
 | --- | --- | --- | --- | --- | --- |
@@ -89,15 +128,27 @@ Tests use an in-memory SQLite database (`phpunit.xml`). They do not need the fil
 | Supplier User B | supplier.user.b@example.com | password | Supplier Company B | supplier | supplier_user |
 | Admin User | admin@example.com | password | none | none | admin |
 
+**Intermediary users are not seeded.** Assessment 2 creates intermediary companies/users inside the test suite (`MultiPartyConfidentialitySecurityTest`). For manual multi-party API checks, create intermediary companies/users yourself or rely on the automated tests.
+
 Seeded bank records: Supplier A (Company A) and Supplier B (Company B), each with one active bank account (banking workflow — distinct from catalog `SupplierProfile`).
 
 Seeded catalog: brands Al Osra/GrainCo; categories Sugar/Grains; published + archived + draft products; specs and price tiers on published sugar.
 
 ### Auth
 
-- `POST /api/login` `{ "email", "password" }` → token
+- `POST /api/login` `{ "email", "password" }` → `{ "token": "..." }` (Sanctum)
 - `GET /api/me` Bearer token
 - `POST /api/logout` Bearer token
+
+Example:
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/api/login \
+  -H "Content-Type: application/json" -H "Accept: application/json" \
+  -d '{"email":"user.a@example.com","password":"password"}'
+```
+
+Use `Authorization: Bearer <token>` on subsequent requests. Deactivated company members cannot login (`403`).
 
 ## Database Structure
 
@@ -440,9 +491,81 @@ All routes below except login require `auth:sanctum`.
 | `GET/PUT` | `/api/products/{product}/specifications` | `product.read` / `product.update` |
 | `GET/PUT` | `/api/products/{product}/price-tiers` | `product.read` / `product.update` |
 
+### Assessment 2 — multi-party confidentiality
+
+Full rules: [`docs/assessment-2/MULTI-PARTY-CONFIDENTIALITY.md`](docs/assessment-2/MULTI-PARTY-CONFIDENTIALITY.md). Chain under test: **Buyer A → Intermediary 1 → Platform → Intermediary 2 → Supplier B**. Do not weaken visibility to make manual probing easier — use the security tests.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| `GET`/`POST` | `/api/purchase-orders/{purchaseOrder}/parties` | List / add intermediary party |
+| `GET` | `/api/purchase-orders/{purchaseOrder}/parties/search` | Search; hidden identities excluded |
+| `GET` | `/api/purchase-orders/{purchaseOrder}/parties/{party}` | Party show (identity gated) |
+| `POST` | `/api/purchase-orders/{purchaseOrder}/identity-grants` | Grant identity visibility |
+| `POST` | `/api/purchase-orders/{purchaseOrder}/identity-grants/revoke` | Revoke grant |
+| `GET`/`POST` | `/api/purchase-orders/{purchaseOrder}/commissions` | List / set commissions (own/admin) |
+| `GET` | `/api/commissions/{commission}` | Direct commission read (404 if unauthorized) |
+| `GET`/`POST` | `/api/purchase-orders/{purchaseOrder}/confidential-notes` | Confidential notes |
+| `GET` | `/api/purchase-orders/{purchaseOrder}/export-view` | Visibility-aware export view |
+| `GET` | `/api/purchase-orders/{purchaseOrder}/visibility` | Scoped PO visibility payload |
+
+Verify: `php artisan test --filter=MultiPartyConfidentialitySecurityTest`
+
+### Sprint 18 — company onboarding
+
+Details: [`docs/sprint-18/FOUNDATION.md`](docs/sprint-18/FOUNDATION.md).
+
+| Method | Path | Permission family |
+| --- | --- | --- |
+| `GET`/`PUT`/`PATCH` | `/api/company/profile` | `company.profile.*` |
+| CRUD | `/api/company/addresses` | `company.address.*` |
+| CRUD | `/api/company/contacts` | `company.contact.*` |
+| `GET` + activate/deactivate | `/api/company/members` | `company.member.*` |
+| `GET`/`POST` + revoke | `/api/company/invitations` | `company.invitation.*` |
+| `POST` | `/api/invitations/accept` | public (token); company/role from invitation |
+
+Verify: `php artisan test --filter=CompanyOnboarding`
+
+### Sprint 19 — approval workflows
+
+Details: [`docs/sprint-19/FOUNDATION.md`](docs/sprint-19/FOUNDATION.md). Gates `rfq.submit` and `purchase_order.submit` when an active matching policy exists.
+
+| Method | Path | Permission family |
+| --- | --- | --- |
+| `GET`/`POST` | `/api/approval-policies` | `approval.policy.read` / `manage` |
+| `GET`/`PUT`/`PATCH` | `/api/approval-policies/{approvalPolicy}` | `approval.policy.*` |
+| `POST` | `/api/approval-policies/{approvalPolicy}/activate` | `approval.policy.manage` |
+| `POST` | `/api/approval-policies/{approvalPolicy}/deactivate` | `approval.policy.manage` |
+| `GET` | `/api/approval-requests` | `approval.request.read` |
+| `GET` | `/api/approval-requests/{approvalRequest}` | `approval.request.read` |
+| `POST` | `/api/approval-requests/{approvalRequest}/approve` | `approval.request.decide` |
+| `POST` | `/api/approval-requests/{approvalRequest}/reject` | `approval.request.decide` |
+| `POST` | `/api/approval-requests/{approvalRequest}/cancel` | `approval.request.cancel` |
+
+Domain objects: `ApprovalPolicy`, `ApprovalPolicyStep`, `ApprovalRequest`, `ApprovalDecision`, `ApprovalWorkflowService`.
+
+Verify: `php artisan test --filter=ApprovalWorkflow`
+
+### Discovering routes
+
+```bash
+php artisan route:list
+php artisan route:list --path=api
+```
+
 ## Testing
 
 ```bash
+php artisan test
+```
+
+Recommended evaluator checks after setup:
+
+```bash
+php artisan migrate:fresh --seed --force
+php artisan route:list --path=api
+php artisan test --filter=MultiPartyConfidentialitySecurityTest
+php artisan test --filter=ApprovalWorkflow
+php artisan test --filter=CompanyOnboarding
 php artisan test
 ```
 
@@ -524,7 +647,9 @@ Business rules were validated by those tests and by reading the write paths (`Mo
 
 ## Assumptions
 
-- SQLite is the local and test database.
+- **PHP 8.4+** is required for locked dependencies (Symfony components `>=8.4.1`).
+- SQLite is the local and test database (default assessment configuration).
+- No public hosted URL is bundled with the Git delivery; `php artisan serve` or a host pointing at `public/` is required locally.
 - Two buyer roles historically: `admin` (all permissions, no company) and `company_user` (no approve permissions). `supplier_user` is the supplier company role.
 - Admin can read/update/approve across companies but cannot create an RFQ (no company context).
 - New RFQs start as `draft`. Status is not an approval state machine.
