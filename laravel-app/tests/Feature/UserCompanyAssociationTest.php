@@ -27,6 +27,9 @@ class UserCompanyAssociationTest extends TestCase
 
         $this->assertNotNull($user->company_id);
         $this->assertSame(CompanySeeder::COMPANY_A, $user->company->name);
+        $this->assertTrue($user->company->isBuyer());
+        $this->assertFalse($user->company->isSupplier());
+        $this->assertTrue($user->isBuyerUser());
         $this->assertFalse($user->isAdmin());
         $this->assertTrue($user->hasRole(Role::COMPANY_USER));
     }
@@ -37,8 +40,25 @@ class UserCompanyAssociationTest extends TestCase
 
         $this->assertNotNull($user->company_id);
         $this->assertSame(CompanySeeder::COMPANY_B, $user->company->name);
+        $this->assertTrue($user->company->isBuyer());
+        $this->assertFalse($user->company->isSupplier());
         $this->assertFalse($user->isAdmin());
         $this->assertTrue($user->hasRole(Role::COMPANY_USER));
+    }
+
+    public function test_supplier_user_belongs_to_supplier_company(): void
+    {
+        $user = User::query()->where('email', UserSeeder::SUPPLIER_USER_EMAIL)->firstOrFail();
+
+        $this->assertNotNull($user->company_id);
+        $this->assertSame(CompanySeeder::SUPPLIER_COMPANY, $user->company->name);
+        $this->assertFalse($user->company->isBuyer());
+        $this->assertTrue($user->company->isSupplier());
+        $this->assertTrue($user->isSupplierUser());
+        $this->assertFalse($user->isBuyerUser());
+        $this->assertFalse($user->isAdmin());
+        $this->assertTrue($user->hasRole(Role::SUPPLIER_USER));
+        $this->assertFalse($user->hasRole(Role::COMPANY_USER));
     }
 
     public function test_admin_user_is_not_tied_to_a_company(): void
@@ -50,5 +70,7 @@ class UserCompanyAssociationTest extends TestCase
         $this->assertTrue($admin->isAdmin());
         $this->assertTrue($admin->hasRole(Role::ADMIN));
         $this->assertFalse($admin->hasRole(Role::COMPANY_USER));
+        $this->assertFalse($admin->isBuyerUser());
+        $this->assertFalse($admin->isSupplierUser());
     }
 }

@@ -45,6 +45,16 @@ abstract class SecurityTestCase extends TestCase
         return User::query()->where('email', UserSeeder::ADMIN_EMAIL)->firstOrFail();
     }
 
+    protected function supplierUser(): User
+    {
+        return User::query()->where('email', UserSeeder::SUPPLIER_USER_EMAIL)->firstOrFail();
+    }
+
+    protected function supplierUserB(): User
+    {
+        return User::query()->where('email', UserSeeder::SUPPLIER_USER_B_EMAIL)->firstOrFail();
+    }
+
     protected function supplierA(): Supplier
     {
         return Supplier::query()->where('name', SupplierSeeder::SUPPLIER_A)->firstOrFail();
@@ -61,6 +71,7 @@ abstract class SecurityTestCase extends TestCase
     protected function createOfficialRfq(Company $company, array $overrides = []): Rfq
     {
         return $company->rfqs()->create([
+            'title' => 'Official RFQ',
             'commodity' => 'Sugar',
             'specification' => 'ICUMSA 45',
             'quantity' => 25000,
