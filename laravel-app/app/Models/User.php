@@ -28,7 +28,16 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
         ];
+    }
+
+    /**
+     * Active membership is server-managed (never mass-assigned from client input).
+     */
+    public function isActiveMember(): bool
+    {
+        return (bool) $this->is_active;
     }
 
     /**
@@ -52,6 +61,27 @@ class User extends Authenticatable
     public function isAdmin(): bool
     {
         return $this->hasRole(Role::ADMIN);
+    }
+
+    /**
+     * Buyer capability is resolved from the user's authorized company, never from client input.
+     */
+    public function isBuyerUser(): bool
+    {
+        return $this->company?->isBuyer() === true;
+    }
+
+    /**
+     * Supplier capability is resolved from the user's authorized company, never from client input.
+     */
+    public function isSupplierUser(): bool
+    {
+        return $this->company?->isSupplier() === true;
+    }
+
+    public function isIntermediaryUser(): bool
+    {
+        return $this->hasRole(Role::INTERMEDIARY_USER);
     }
 
     public function hasRole(string $role): bool
@@ -83,13 +113,29 @@ class User extends Authenticatable
             'id' => $this->id,
             'name' => $this->name,
             'email' => $this->email,
+            'is_active' => $this->isActiveMember(),
             'is_admin' => $this->isAdmin(),
-            'company' => $this->company ? [
-                'id' => $this->company->id,
-                'name' => $this->company->name,
-            ] : null,
+            'company' => $this->company?->toApiArray(),
             'role' => $this->role?->name,
             'permissions' => $this->permissionNames(),
+        ];
+    }
+
+    /**
+     * Member listing for company administrators (no permission dump).
+     *
+     * @return array<string, mixed>
+     */
+    public function toMemberApiArray(): array
+    {
+        $this->loadMissing('role');
+
+        return [
+            'id' => $this->id,
+            'name' => $this->name,
+            'email' => $this->email,
+            'is_active' => $this->isActiveMember(),
+            'role' => $this->role?->name,
         ];
     }
 }
